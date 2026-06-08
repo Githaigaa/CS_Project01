@@ -1,2 +1,2 @@
 # CS_Project01
-Implementing a Cattle Traceability and Marketplace Platform for Kenyan Livestock.
+Implementing a Cattle traceability and digital marketplace platform — built for Kenya's agricultural ecosystem.
