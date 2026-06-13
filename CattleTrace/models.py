@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models import CASCADE
 from django.utils import timezone
 
 def prefixed_id(prefix):
@@ -255,3 +256,123 @@ class HealthEvent(models.Model):
         ordering = ["date_of_event", "registered_at"]
 
     def __str__(self):
+        return f"{self.event_type} for {self.animal_id} on {self.date_of_event}"
+
+    def trigger_alert(self):
+        return self.event_type in {EventType.DISEASE, EventType.DEATH}
+
+class MovementRecord(models.Model):
+    movement_id = models.CharField(max_length=100, primary_key=True, default=movement_id, editable=False, db_column="movement_ID",)
+    animal = models.ForegnKey(Animal, on_delete=models.CASCADE, related_name="movement_records", to_field="rfid_number", db_column="animal")
+    from_holding = models.ForeignKey(Holding, on_delete=models.PROTECT, related_name="outgoing_movements", db_column="from_holding_ID",)
+    to_holding = models.ForeignKey(Holding, on_delete=models.PROTECT, related_name="incoming_movements", db_column="to_holding_ID",)
+    movement_date = models.DateField()
+    purpose_of_movement = models.CharField(max_length=255, db_column="purpose_of_movement", choices=MovementPurpose.choices,)
+    country_crossing = models.BooleanField(default=False)
+    permit_number = models.CharField(max_length=255,)
+    movement_status = models.CharField(max_length=30, choices=MovementStatus.choices, default=MovementStatus.PENDING,)
+    linked_transaction = models.ForeignKey("Transaction", on_delete=models.SET_NULL, null=True, blank=True, related_name="movement_records", db_column="linked_transaction_ID",)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        db_table = "movement_records"
+        ordering = ["movement_date", "created_at"]
+
+    def __str__(self):
+        return f"{self.animal_id}: {self.from_holding_id} to {self.to_holding_id}"
+
+    def attach_permit(self, permit_number):
+        self.permit_number = permit_number
+        self.save(update_fields=["permit_number"])
+
+    def confirm(self):
+        self.movement_status = MovementStatus.COMPLETED
+        self.save(update_fields=["movement_status"])
+
+class Transaction(models.Model):
+    transaction_id = models.CharField(max_length=100, primary_key=True, default=transaction_id, editable=False, db_column="transaction_ID",)
+    seller = models.ForeignKey(Owner, on_delete=models.PROTECT, related_name="sales",db_column="seller_ID",)
+    buyer = models.ForeignKey(Owner, on_delete=models.PROTECT, related_name="purchases",db_column="buyer_ID",)
+    animal = models.ForeignKey(Animal, on_delete=models.PROTECT, related_name="transactions", db_column="animal_ID",)
+    asking_price = models.DecimalField(max_digits=12, decimal_places=2)
+    agreed_price = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_status = models.CharField(max_length=30, choices=PaymentStatus.choices, default=PaymentStatus.PENDING,)
+    sale_channel = models.CharField(max_length=255, choices=SaleChannel.choices, default=SaleChannel.choices,)
+    delivery_arrangement = models.CharField(max_length=255)
+    sale_date = models.DateField()
+    registered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "transaction"
+        ordering = ["sale_date", "registered_at"]
+
+    def __str__(self):
+        return f"{self.transaction_id} - {self.animal_id}"
+
+    def make_offer(self, agreed_price):
+        self.agreed_price = agreed_price
+        self.save(update_fields=["agreed_price"])
+
+    def confirm_payment(self):
+        self.payment_status = PaymentStatus.PAID
+        self.save(update_fields=["payment_status"])
+
+    def trigger_transfer(self):
+        self.animal.transfer(self.buyer, self.animal.current_holding)
+
+class Abattoir(models.Model):
+    abattoir_id = models.CharField(max_length=100, primary_key=True, default=abattoir_id, editable=False, db_column="abattoir_ID",)
+    license_number = models.CharField(max_length=255, unique=True,)
+    holding = models.ForeignKey(Holding, on_delete=models.PROTECT, related_name="abattoirs", db_column="holding_ID",)
+    county = models.CharField(max_length=255, db_column="county",)
+    sub_county = models.CharField(max_length=255, db_column="sub_county",)
+    phone_number = models.CharField(max_length=255,)
+    registered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "abattoirs"
+        ordering = ["abattoir_id"]
+
+    def __str__(self):
+        return f"{self.abattoir_id} - {self.license_number}"
+
+    def get_slaughter_history(self):
+        return self.slaughter_records.all()
+
+    def get_batch_report(self, batch_number):
+        return self.slaughter_records.filter(batch_number=batch_number)
+
+    def verify_incoming_animal(self, animal):
+        return animal.current_holding_id == self.holding_id
+
+    class SlaughterRecord(models.Model):
+        slaughter_record_id = models.CharField(max_length=100, primary_key=True, default=slaughter_record_id, editable=False, db_column="slaughter_record_ID",)
+        abattoir = models.ForeignKey(Abattoir, on_delete=models.PROTECT, related_name="slaughter_records", db_column="abattoir_ID",)
+        last_holding = models.ForeignKey(Holding, on_delete=models.PROTECT, related_name="slaughter_records", db_column="last_holding_ID",)
+        chain_number= models.CharField(max_length=80, db_column="chain_number",)
+        carcass_feedback = models.CharField(max_length=255,)
+        batch_number = models.CharField(max_length=255,)
+        date_of_slaughter = models.DateField()
+        created_at = models.DateTimeField(auto_now_add=True)
+
+        class Meta:
+            db_table = "slaughter_record"
+            ordering = ["date_of_slaughter", "created_at"]
+
+        def __str__(self):
+            return f"{self.slaughter_record_id} - {self.animal_id}"
+
+        def attach_carcass_feedback(self, feedback):
+            self.carcass_feedback = feedback
+            self.save(update_fields=["carcass_feedback"])
+
+        def get_batch_animal(self):
+            return SlaughterRecord.objects.filter(batch_number=self.batch_number)
+
+        def notify_last_owner(self):
+            return self.animal.current_owner
+
+
+
+
+
+
