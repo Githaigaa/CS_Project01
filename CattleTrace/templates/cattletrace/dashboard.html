@@ -1,0 +1,97 @@
+{% extends "cattletrace/base.html" %}
+
+{% block title %}Dashboard | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div>
+        <h1>Dashboard</h1>
+        <p>Overview of your livestock management system</p>
+    </div>
+</section>
+
+<section class="stats-grid">
+    {% for item in stats %}
+        <article class="stat-card">
+            <div>
+                <p class="stat-label">{{ item.label }}</p>
+                <div class="stat-value">{{ item.value }}</div>
+            </div>
+            <div class="stat-icon {{ item.tone }}">{{ item.icon }}</div>
+            <p class="stat-hint">{{ item.hint }}</p>
+        </article>
+    {% endfor %}
+</section>
+
+<section class="dashboard-grid">
+    <article class="card">
+        <div class="card-header">
+            <h2>Animal Population Trend</h2>
+        </div>
+        <div class="chart-placeholder">
+            <div class="line-chart"></div>
+            <span>Population trend</span>
+        </div>
+    </article>
+
+    <article class="card">
+        <div class="card-header">
+            <h2>Species Distribution</h2>
+        </div>
+        <div class="species-list">
+            {% for item in species_counts %}
+                <div class="species-row">
+                    <span>{{ item.label }}</span>
+                    <strong>{{ item.count }}</strong>
+                </div>
+            {% empty %}
+                <p class="empty-state">No species data yet.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="dashboard-grid">
+    <article class="card">
+        <div class="card-header">
+            <h2>Recent Movement Activity</h2>
+        </div>
+        <div class="activity-list">
+            {% for movement in recent_movements %}
+                <div class="activity-item">
+                    <div class="activity-icon">M</div>
+                    <div>
+                        <strong>RFID: {{ movement.animal_id }}</strong>
+                        <p>{{ movement.from_holding }} to {{ movement.to_holding }}</p>
+                        <small>{{ movement.movement_date }}</small>
+                    </div>
+                    <span class="badge badge-warning">{{ movement.movement_status }}</span>
+                </div>
+            {% empty %}
+                <p class="empty-state">No movement records yet.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="card">
+        <div class="card-header">
+            <h2>Recent Health Events</h2>
+        </div>
+        <div class="activity-list">
+            {% for event in recent_health_events %}
+                <div class="activity-item">
+                    <div class="activity-icon">R</div>
+                    <div>
+                        <strong>{{ event.event_type }}</strong>
+                        <p>RFID: {{ event.animal }}</p>
+                        <small>{{ event.date_of_event }}</small>
+                    </div>
+                    <span class="badge badge-info">{{ event.credential_level }}</span>
+                </div>
+            {% empty %}
+                <p class="empty-state">No health events yet.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}

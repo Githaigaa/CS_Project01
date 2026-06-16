@@ -1,8 +1,8 @@
 from django import forms
 from django.core.paginator import Paginator
-from django.http import HttpResponse, JsonResponse
-from django.middleware.csrf import get_token
-from django.shortcuts import get_object_or_404, redirect
+from django.db.models import Q
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -19,19 +19,31 @@ from .models import (
 )
 
 
-class OwnerForm(forms.ModelForm):
+class StyledModelForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            existing_classes = widget.attrs.get("class", "")
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs["class"] = f"{existing_classes} form-check".strip()
+            else:
+                widget.attrs["class"] = f"{existing_classes} form-control".strip()
+
+
+class OwnerForm(StyledModelForm):
     class Meta:
         model = Owner
         fields = ["national_id", "name", "phone_number", "county", "sub_county", "owner_type"]
 
 
-class HoldingForm(forms.ModelForm):
+class HoldingForm(StyledModelForm):
     class Meta:
         model = Holding
         fields = ["owner", "county", "sub_county", "ward", "gps_coordinates", "holding_type", "owner_type"]
 
 
-class AnimalForm(forms.ModelForm):
+class AnimalForm(StyledModelForm):
     class Meta:
         model = Animal
         fields = [
@@ -50,7 +62,7 @@ class AnimalForm(forms.ModelForm):
         ]
 
 
-class AnimalHealthWorkerForm(forms.ModelForm):
+class AnimalHealthWorkerForm(StyledModelForm):
     class Meta:
         model = AnimalHealthWorker
         fields = [
@@ -65,7 +77,7 @@ class AnimalHealthWorkerForm(forms.ModelForm):
         ]
 
 
-class HealthEventForm(forms.ModelForm):
+class HealthEventForm(StyledModelForm):
     class Meta:
         model = HealthEvent
         fields = [
@@ -83,7 +95,7 @@ class HealthEventForm(forms.ModelForm):
         widgets = {"date_of_event": forms.DateInput(attrs={"type": "date"})}
 
 
-class TransactionForm(forms.ModelForm):
+class TransactionForm(StyledModelForm):
     class Meta:
         model = Transaction
         fields = [
@@ -100,7 +112,7 @@ class TransactionForm(forms.ModelForm):
         widgets = {"sale_date": forms.DateInput(attrs={"type": "date"})}
 
 
-class MovementRecordForm(forms.ModelForm):
+class MovementRecordForm(StyledModelForm):
     class Meta:
         model = MovementRecord
         fields = [
@@ -117,13 +129,13 @@ class MovementRecordForm(forms.ModelForm):
         widgets = {"movement_date": forms.DateInput(attrs={"type": "date"})}
 
 
-class AbattoirForm(forms.ModelForm):
+class AbattoirForm(StyledModelForm):
     class Meta:
         model = Abattoir
         fields = ["license_number", "holding", "county", "sub_county", "phone_number"]
 
 
-class SlaughterRecordForm(forms.ModelForm):
+class SlaughterRecordForm(StyledModelForm):
     class Meta:
         model = SlaughterRecord
         fields = [
@@ -143,6 +155,7 @@ MODEL_CONFIG = {
         "model": Owner,
         "form": OwnerForm,
         "title": "Owners",
+        "subtitle": "Manage farmer and owner identity records",
         "pk": "owner_id",
         "list_fields": ["owner_id", "name", "national_id", "phone_number", "county", "sub_county", "owner_type"],
         "search_fields": ["owner_id", "name", "national_id", "phone_number", "county", "sub_county"],
@@ -151,6 +164,7 @@ MODEL_CONFIG = {
         "model": Holding,
         "form": HoldingForm,
         "title": "Holdings",
+        "subtitle": "Track registered farms, markets, and animal locations",
         "pk": "holding_id",
         "list_fields": ["holding_id", "owner", "county", "sub_county", "ward", "holding_type"],
         "search_fields": ["holding_id", "owner__name", "county", "sub_county", "ward"],
@@ -158,7 +172,8 @@ MODEL_CONFIG = {
     "animals": {
         "model": Animal,
         "form": AnimalForm,
-        "title": "Animals",
+        "title": "Animal Registry",
+        "subtitle": "Manage and track all registered animals",
         "pk": "animal_id",
         "list_fields": ["animal_id", "rfid_number", "species", "sex", "current_owner", "animal_status"],
         "search_fields": ["animal_id", "rfid_number", "breed", "current_owner__name"],
@@ -167,6 +182,7 @@ MODEL_CONFIG = {
         "model": AnimalHealthWorker,
         "form": AnimalHealthWorkerForm,
         "title": "Animal Health Workers",
+        "subtitle": "Maintain veterinary and animal health worker records",
         "pk": "worker_id",
         "list_fields": ["worker_id", "name", "dvs_number", "phone_number", "county", "worker_type", "verified"],
         "search_fields": ["worker_id", "name", "dvs_number", "phone_number", "county", "worker_type"],
@@ -174,7 +190,8 @@ MODEL_CONFIG = {
     "health_events": {
         "model": HealthEvent,
         "form": HealthEventForm,
-        "title": "Health Events",
+        "title": "Health Records",
+        "subtitle": "Record vaccinations, treatments, disease reports, and inspections",
         "pk": "event_id",
         "list_fields": ["event_id", "animal", "event_type", "date_of_event", "recorded_by", "credential_level"],
         "search_fields": ["event_id", "animal__rfid_number", "recorded_by__name", "disease_name", "vaccine_name"],
@@ -182,7 +199,8 @@ MODEL_CONFIG = {
     "movements": {
         "model": MovementRecord,
         "form": MovementRecordForm,
-        "title": "Movement Records",
+        "title": "Animal Movement Tracking",
+        "subtitle": "Monitor livestock movements between holdings",
         "pk": "movement_id",
         "list_fields": ["movement_id", "animal", "from_holding", "to_holding", "movement_date", "movement_status"],
         "search_fields": ["movement_id", "animal__rfid_number", "from_holding__holding_id", "to_holding__holding_id"],
@@ -191,6 +209,7 @@ MODEL_CONFIG = {
         "model": Transaction,
         "form": TransactionForm,
         "title": "Transactions",
+        "subtitle": "Track animal sales, payments, and ownership transfers",
         "pk": "transaction_id",
         "list_fields": ["transaction_id", "animal", "seller", "buyer", "agreed_price", "payment_status", "sale_date"],
         "search_fields": ["transaction_id", "animal__rfid_number", "seller__name", "buyer__name"],
@@ -198,7 +217,8 @@ MODEL_CONFIG = {
     "abattoirs": {
         "model": Abattoir,
         "form": AbattoirForm,
-        "title": "Abattoirs",
+        "title": "Abattoir Management",
+        "subtitle": "Manage slaughter facilities and processing locations",
         "pk": "abattoir_id",
         "list_fields": ["abattoir_id", "license_number", "holding", "county", "sub_county", "phone_number"],
         "search_fields": ["abattoir_id", "license_number", "holding__holding_id", "county", "sub_county"],
@@ -207,6 +227,7 @@ MODEL_CONFIG = {
         "model": SlaughterRecord,
         "form": SlaughterRecordForm,
         "title": "Slaughter Records",
+        "subtitle": "Maintain carcass, batch, and slaughter traceability records",
         "pk": "slaughter_record_id",
         "list_fields": ["slaughter_record_id", "animal", "abattoir", "last_holding", "batch_number", "date_of_slaughter"],
         "search_fields": ["slaughter_record_id", "animal__rfid_number", "abattoir__license_number", "batch_number"],
@@ -214,60 +235,57 @@ MODEL_CONFIG = {
 }
 
 
+NAV_ITEMS = [
+    ("home", "Dashboard", "cattletrace:home", "H"),
+    ("animals", "Animals", "cattletrace:animals", "A"),
+    ("holdings", "Holdings", "cattletrace:holdings", "P"),
+    ("owners", "Owners", "cattletrace:owners", "O"),
+    ("movements", "Movements", "cattletrace:movements", "M"),
+    ("health_events", "Health Records", "cattletrace:health_events", "R"),
+    ("transactions", "Transactions", "cattletrace:transactions", "T"),
+    ("abattoirs", "Abattoirs", "cattletrace:abattoirs", "B"),
+    ("slaughter_records", "Slaughter Records", "cattletrace:slaughter_records", "S"),
+    ("health_workers", "Health Workers", "cattletrace:health_workers", "W"),
+]
+
+
 def wants_json(request):
     return request.GET.get("format") == "json" or "application/json" in request.headers.get("Accept", "")
 
 
-def page(title, body):
-    return f"""
-    <!doctype html>
-    <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{title} | CattleTrace</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 32px; color: #1f2933; }}
-            nav a, .actions a {{ margin-right: 12px; }}
-            table {{ border-collapse: collapse; width: 100%; margin-top: 16px; }}
-            th, td {{ border: 1px solid #d9e2ec; padding: 8px; text-align: left; }}
-            th {{ background: #f0f4f8; }}
-            label {{ display: block; font-weight: 600; margin-top: 12px; }}
-            input, select, textarea {{ box-sizing: border-box; max-width: 520px; width: 100%; padding: 8px; }}
-            button {{ margin-top: 16px; padding: 8px 14px; cursor: pointer; }}
-            .errorlist {{ color: #b91c1c; }}
-        </style>
-    </head>
-    <body>
-        <nav>
-            <a href="{reverse("cattletrace:home")}">Dashboard</a>
-            <a href="{reverse("cattletrace:owners")}">Owners</a>
-            <a href="{reverse("cattletrace:holdings")}">Holdings</a>
-            <a href="{reverse("cattletrace:animals")}">Animals</a>
-            <a href="{reverse("cattletrace:health_workers")}">Health Workers</a>
-            <a href="{reverse("cattletrace:health_events")}">Health Events</a>
-            <a href="{reverse("cattletrace:movements")}">Movements</a>
-            <a href="{reverse("cattletrace:transactions")}">Transactions</a>
-            <a href="{reverse("cattletrace:abattoirs")}">Abattoirs</a>
-            <a href="{reverse("cattletrace:slaughter_records")}">Slaughter Records</a>
-        </nav>
-        {body}
-    </body>
-    </html>
-    """
+def template_context(active_key):
+    return {"nav_items": NAV_ITEMS, "active_key": active_key}
 
 
-def csrf_input(request):
-    return f'<input type="hidden" name="csrfmiddlewaretoken" value="{get_token(request)}">'
+def label_for(field_name):
+    return field_name.replace("_", " ").title()
+
+
+def value_for(obj, field_name):
+    value = getattr(obj, field_name)
+    if value is True:
+        return "Yes"
+    if value is False:
+        return "No"
+    return str(value) if value is not None else ""
+
+
+def badge_class(value):
+    value = str(value).lower()
+    if value in {"active", "completed", "paid", "verified", "yes"}:
+        return "badge-success"
+    if value in {"pending", "in_transit", "treatment", "inspection"}:
+        return "badge-warning"
+    if value in {"dead", "lost", "failed", "cancelled", "death", "disease", "no"}:
+        return "badge-danger"
+    if value in {"sold", "transferred", "refunded", "vaccination"}:
+        return "badge-info"
+    return "badge-neutral"
 
 
 def serialize_object(obj, fields=None):
     fields = fields or [field.name for field in obj._meta.fields]
-    data = {}
-    for field in fields:
-        value = getattr(obj, field)
-        data[field] = str(value) if value is not None else None
-    return data
+    return {field: value_for(obj, field) for field in fields}
 
 
 def apply_search(queryset, request, fields):
@@ -275,12 +293,33 @@ def apply_search(queryset, request, fields):
     if not query:
         return queryset
 
-    from django.db.models import Q
-
     filters = Q()
     for field in fields:
         filters |= Q(**{f"{field}__icontains": query})
     return queryset.filter(filters)
+
+
+def build_table_rows(page_obj, config, key):
+    rows = []
+    for obj in page_obj:
+        pk_value = getattr(obj, config["pk"])
+        cells = []
+        for field in config["list_fields"]:
+            value = value_for(obj, field)
+            is_badge = field.endswith("status") or field in {"event_type", "verified", "credential_level"}
+            cells.append({
+                "value": value,
+                "is_badge": is_badge,
+                "badge_class": badge_class(value),
+            })
+        rows.append({
+            "pk": pk_value,
+            "detail_url": reverse(f"cattletrace:{key}_detail", args=[pk_value]),
+            "update_url": reverse(f"cattletrace:{key}_update", args=[pk_value]),
+            "delete_url": reverse(f"cattletrace:{key}_delete", args=[pk_value]),
+            "cells": cells,
+        })
+    return rows
 
 
 def resource_list(request, key):
@@ -295,28 +334,18 @@ def resource_list(request, key):
 
     paginator = Paginator(queryset, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
-    rows = []
-    for obj in page_obj:
-        pk_value = getattr(obj, config["pk"])
-        detail_url = reverse(f"cattletrace:{key}_detail", args=[pk_value])
-        cells = "".join(f"<td>{getattr(obj, field)}</td>" for field in config["list_fields"])
-        rows.append(f"<tr>{cells}<td><a href='{detail_url}'>View</a></td></tr>")
-
-    headings = "".join(f"<th>{field.replace('_', ' ').title()}</th>" for field in config["list_fields"])
-    body = f"""
-        <h1>{config["title"]}</h1>
-        <form method="get">
-            <input name="q" value="{request.GET.get("q", "")}" placeholder="Search {config["title"].lower()}">
-            <button type="submit">Search</button>
-        </form>
-        <p><a href="{reverse(f"cattletrace:{key}_create")}">Create new</a></p>
-        <table>
-            <thead><tr>{headings}<th>Actions</th></tr></thead>
-            <tbody>{"".join(rows) or "<tr><td colspan='20'>No records found.</td></tr>"}</tbody>
-        </table>
-        <p>Page {page_obj.number} of {paginator.num_pages}</p>
-    """
-    return HttpResponse(page(config["title"], body))
+    context = {
+        **template_context(key),
+        "config": config,
+        "resource_key": key,
+        "query": request.GET.get("q", ""),
+        "page_obj": page_obj,
+        "total_count": queryset.count(),
+        "headers": [label_for(field) for field in config["list_fields"]],
+        "rows": build_table_rows(page_obj, config, key),
+        "create_url": reverse(f"cattletrace:{key}_create"),
+    }
+    return render(request, "cattletrace/resource_list.html", context)
 
 
 def resource_detail(request, key, pk):
@@ -326,29 +355,27 @@ def resource_detail(request, key, pk):
     if wants_json(request):
         return JsonResponse(serialize_object(obj))
 
-    rows = "".join(
-        f"<tr><th>{field.name.replace('_', ' ').title()}</th><td>{getattr(obj, field.name)}</td></tr>"
+    fields = [
+        {"label": label_for(field.name), "value": value_for(obj, field.name)}
         for field in obj._meta.fields
-    )
-    body = f"""
-        <h1>{config["title"]} Detail</h1>
-        <table>{rows}</table>
-        <p class="actions">
-            <a href="{reverse(f"cattletrace:{key}_update", args=[pk])}">Edit</a>
-            <a href="{reverse(f"cattletrace:{key}")}">Back to list</a>
-        </p>
-        <form method="post" action="{reverse(f"cattletrace:{key}_delete", args=[pk])}">
-            {csrf_input(request)}
-            <button type="submit">Delete</button>
-        </form>
-    """
-    return HttpResponse(page(f"{config['title']} Detail", body))
+    ]
+    context = {
+        **template_context(key),
+        "config": config,
+        "object": obj,
+        "fields": fields,
+        "list_url": reverse(f"cattletrace:{key}"),
+        "update_url": reverse(f"cattletrace:{key}_update", args=[pk]),
+        "delete_url": reverse(f"cattletrace:{key}_delete", args=[pk]),
+    }
+    return render(request, "cattletrace/resource_detail.html", context)
 
 
 @require_http_methods(["GET", "POST"])
 def resource_create(request, key):
     config = MODEL_CONFIG[key]
-    form = config["form"](request.POST or None)
+    # include request.FILES so file uploads (ImageField/FileField) are processed
+    form = config["form"](request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         obj = form.save()
         if wants_json(request):
@@ -358,23 +385,23 @@ def resource_create(request, key):
     if wants_json(request) and request.method == "POST":
         return JsonResponse({"errors": form.errors}, status=400)
 
-    body = f"""
-        <h1>Create {config["title"]}</h1>
-        <form method="post">
-            {csrf_input(request)}
-            {form.as_p()}
-            <button type="submit">Save</button>
-        </form>
-        <p><a href="{reverse(f"cattletrace:{key}")}">Back to list</a></p>
-    """
-    return HttpResponse(page(f"Create {config['title']}", body))
+    context = {
+        **template_context(key),
+        "config": config,
+        "form": form,
+        "form_title": f"Create {config['title']}",
+        "submit_label": "Save record",
+        "cancel_url": reverse(f"cattletrace:{key}"),
+    }
+    return render(request, "cattletrace/resource_form.html", context)
 
 
 @require_http_methods(["GET", "POST"])
 def resource_update(request, key, pk):
     config = MODEL_CONFIG[key]
     obj = get_object_or_404(config["model"], pk=pk)
-    form = config["form"](request.POST or None, instance=obj)
+    # include request.FILES so file uploads replace existing files when updating
+    form = config["form"](request.POST or None, request.FILES or None, instance=obj)
     if request.method == "POST" and form.is_valid():
         obj = form.save()
         if wants_json(request):
@@ -384,16 +411,15 @@ def resource_update(request, key, pk):
     if wants_json(request) and request.method == "POST":
         return JsonResponse({"errors": form.errors}, status=400)
 
-    body = f"""
-        <h1>Edit {config["title"]}</h1>
-        <form method="post">
-            {csrf_input(request)}
-            {form.as_p()}
-            <button type="submit">Save changes</button>
-        </form>
-        <p><a href="{reverse(f"cattletrace:{key}_detail", args=[pk])}">Cancel</a></p>
-    """
-    return HttpResponse(page(f"Edit {config['title']}", body))
+    context = {
+        **template_context(key),
+        "config": config,
+        "form": form,
+        "form_title": f"Edit {config['title']}",
+        "submit_label": "Save changes",
+        "cancel_url": reverse(f"cattletrace:{key}_detail", args=[pk]),
+    }
+    return render(request, "cattletrace/resource_form.html", context)
 
 
 @require_POST
@@ -407,12 +433,32 @@ def resource_delete(request, key, pk):
 
 
 def home(request):
-    counts = {config["title"]: config["model"].objects.count() for config in MODEL_CONFIG.values()}
-    if wants_json(request):
-        return JsonResponse(counts)
+    stats = [
+        {"label": "Total Animals", "value": Animal.objects.count(), "hint": "Registered animals", "tone": "primary", "icon": "A"},
+        {"label": "Active Holdings", "value": Holding.objects.count(), "hint": "Registered properties", "tone": "secondary", "icon": "P"},
+        {"label": "Health Alerts", "value": HealthEvent.objects.filter(event_type__in=["disease", "death"]).count(), "hint": "Requires attention", "tone": "danger", "icon": "R"},
+        {"label": "Pending Transfers", "value": MovementRecord.objects.filter(movement_status="pending").count(), "hint": "Awaiting approval", "tone": "warning", "icon": "M"},
+        {"label": "Recent Transactions", "value": Transaction.objects.count(), "hint": "Sale records", "tone": "success", "icon": "T"},
+        {"label": "Abattoirs", "value": Abattoir.objects.count(), "hint": "Processing facilities", "tone": "info", "icon": "B"},
+    ]
 
-    cards = "".join(f"<li>{name}: {count}</li>" for name, count in counts.items())
-    return HttpResponse(page("Dashboard", f"<h1>CattleTrace Dashboard</h1><ul>{cards}</ul>"))
+    if wants_json(request):
+        return JsonResponse({item["label"]: item["value"] for item in stats})
+
+    recent_movements = MovementRecord.objects.select_related("animal", "from_holding", "to_holding")[:5]
+    recent_health_events = HealthEvent.objects.select_related("animal", "recorded_by")[:5]
+    species_counts = [
+        {"label": label_for(code), "count": Animal.objects.filter(species=code).count()}
+        for code, _ in Animal._meta.get_field("species").choices
+    ]
+    context = {
+        **template_context("home"),
+        "stats": stats,
+        "recent_movements": recent_movements,
+        "recent_health_events": recent_health_events,
+        "species_counts": species_counts,
+    }
+    return render(request, "cattletrace/dashboard.html", context)
 
 
 def owners(request):

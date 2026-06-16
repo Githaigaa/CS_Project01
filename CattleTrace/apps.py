@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class CattletraceConfig(AppConfig):
-    name = 'CattleTrace'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "CattleTrace"
+    verbose_name = "Cattle Trace"

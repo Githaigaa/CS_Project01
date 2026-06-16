@@ -1,0 +1,75 @@
+{% extends "cattletrace/base.html" %}
+
+{% block title %}{{ config.title }} | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-heading split">
+    <div>
+        <h1>{{ config.title }}</h1>
+        <p>{{ config.subtitle }}</p>
+    </div>
+    <a class="button primary" href="{{ create_url }}">New record</a>
+</section>
+
+<section class="card toolbar-card">
+    <form class="filter-grid" method="get">
+        <input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Search {{ config.title|lower }}...">
+        <button class="button outline" type="submit">Filter</button>
+        <a class="button ghost" href="?format=json">JSON</a>
+    </form>
+</section>
+
+<section class="card table-card">
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    {% for header in headers %}
+                        <th>{{ header }}</th>
+                    {% endfor %}
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        {% for cell in row.cells %}
+                            <td>
+                                {% if cell.is_badge %}
+                                    <span class="badge {{ cell.badge_class }}">{{ cell.value }}</span>
+                                {% else %}
+                                    {{ cell.value }}
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td>
+                            <div class="row-actions">
+                                <a class="icon-button small" href="{{ row.detail_url }}" title="View">View</a>
+                                <a class="icon-button small" href="{{ row.update_url }}" title="Edit">Edit</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="20">
+                            <div class="empty-state">No records found.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <footer class="table-footer">
+        <span>Showing {{ page_obj.object_list|length }} of {{ total_count }} records</span>
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a class="button outline small" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a>
+            {% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a class="button outline small" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a>
+            {% endif %}
+        </div>
+    </footer>
+</section>
+{% endblock %}

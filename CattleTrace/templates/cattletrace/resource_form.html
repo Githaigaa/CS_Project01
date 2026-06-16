@@ -1,0 +1,40 @@
+{% extends "cattletrace/base.html" %}
+
+{% block title %}{{ form_title }} | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div>
+        <h1>{{ form_title }}</h1>
+        <p>{{ config.subtitle }}</p>
+    </div>
+</section>
+
+<section class="card form-card">
+    <!-- include enctype so file inputs (images) are uploaded correctly -->
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <div class="form-grid">
+            {% for field in form %}
+                <div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                        <small>{{ field.help_text }}</small>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="field-error">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+        {% if form.non_field_errors %}
+            <div class="field-error">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="form-actions">
+            <a class="button outline" href="{{ cancel_url }}">Cancel</a>
+            <button class="button primary" type="submit">{{ submit_label }}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

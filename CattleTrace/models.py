@@ -256,6 +256,9 @@ class Animal(models.Model):
     class Meta:
         db_table = "animals"
         ordering = ["rfid_number"]
+        permissions = (
+            ("upload_animal_photo", "Can upload animal photo"),
+        )
 
     def __str__(self):
         return f"{self.rfid_number} - {self.species}"
