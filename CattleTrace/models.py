@@ -1,570 +1,533 @@
-import uuid
+"""
+models.py — Cattle Traceability & Marketplace Platform
+Django ORM models covering all platform modules:
+  - User & Farm
+  - Animal Registration & Profile
+  - Health Records
+  - Movement Tracking
+  - Slaughter Records
+  - Marketplace Listings
+  - Notifications
+  - Reports & Analytics (aggregation helpers)
+"""
 
 from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
+import uuid
+
+# ─────────────────────────────────────────────
+# 1. USER & FARM
+# ─────────────────────────────────────────────
 
 
-def prefixed_id(prefix):
-    return f"{prefix}-{uuid.uuid4().hex[:10].upper()}"
+class User(AbstractUser):
+    """Extended user with role-based access."""
 
+    class Role(models.TextChoices):
+        FARMER = "farmer", "Farmer"
+        VET = "vet", "Veterinarian"
+        INSPECTOR = "inspector", "Inspector"
+        BUYER = "buyer", "Buyer"
+        ABATTOIR = "abattoir", "Abattoir"
+        ADMIN = "admin", "Administrator"
 
-def owner_id():
-    return prefixed_id("OWN")
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.FARMER)
+    phone_number = models.CharField(max_length=20, blank=True)
+    national_id = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    profile_photo = models.ImageField(upload_to="users/photos/", blank=True, null=True)
+    location = models.CharField(max_length=255, blank=True)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-
-def holding_id():
-    return prefixed_id("HLD")
-
-
-def animal_id():
-    return prefixed_id("ANM")
-
-
-def worker_id():
-    return prefixed_id("WRK")
-
-
-def health_event_id():
-    return prefixed_id("HEV")
-
-
-def movement_id():
-    return prefixed_id("MOV")
-
-
-def transaction_id():
-    return prefixed_id("TRX")
-
-
-def abattoir_id():
-    return prefixed_id("ABT")
-
-
-def slaughter_record_id():
-    return prefixed_id("SLR")
-
-
-class OwnerType(models.TextChoices):
-    INDIVIDUAL = "individual", "Individual"
-    COMPANY = "company", "Company"
-    COOPERATIVE = "cooperative", "Cooperative"
-    GOVERNMENT = "government", "Government"
-    OTHER = "other", "Other"
-
-
-class HoldingType(models.TextChoices):
-    FARM = "farm", "Farm"
-    MARKET = "market", "Market"
-    QUARANTINE = "quarantine", "Quarantine"
-    ABATTOIR = "abattoir", "Abattoir"
-    OTHER = "other", "Other"
-
-
-class Species(models.TextChoices):
-    CATTLE = "cattle", "Cattle"
-    GOAT = "goat", "Goat"
-    SHEEP = "sheep", "Sheep"
-    OTHER = "other", "Other"
-
-
-class Sex(models.TextChoices):
-    MALE = "male", "Male"
-    FEMALE = "female", "Female"
-    UNKNOWN = "unknown", "Unknown"
-
-
-class AgeClass(models.TextChoices):
-    CALF = "calf", "Calf"
-    WEANER = "weaner", "Weaner"
-    YEARLING = "yearling", "Yearling"
-    ADULT = "adult", "Adult"
-
-
-class AnimalStatus(models.TextChoices):
-    ACTIVE = "active", "Active"
-    SOLD = "sold", "Sold"
-    TRANSFERRED = "transferred", "Transferred"
-    SLAUGHTERED = "slaughtered", "Slaughtered"
-    DEAD = "dead", "Dead"
-    LOST = "lost", "Lost"
-
-
-class EventType(models.TextChoices):
-    VACCINATION = "vaccination", "Vaccination"
-    TREATMENT = "treatment", "Treatment"
-    DISEASE = "disease", "Disease"
-    DEATH = "death", "Death"
-    INSPECTION = "inspection", "Inspection"
-    OTHER = "other", "Other"
-
-
-class CredentialLevel(models.TextChoices):
-    COMMUNITY = "community", "Community"
-    TECHNICIAN = "technician", "Technician"
-    VETERINARY_OFFICER = "veterinary_officer", "Veterinary Officer"
-    ADMIN = "admin", "Admin"
-
-
-class MovementPurpose(models.TextChoices):
-    SALE = "sale", "Sale"
-    GRAZING = "grazing", "Grazing"
-    BREEDING = "breeding", "Breeding"
-    SLAUGHTER = "slaughter", "Slaughter"
-    TREATMENT = "treatment", "Treatment"
-    OTHER = "other", "Other"
-
-
-class MovementStatus(models.TextChoices):
-    PENDING = "pending", "Pending"
-    APPROVED = "approved", "Approved"
-    IN_TRANSIT = "in_transit", "In Transit"
-    COMPLETED = "completed", "Completed"
-    CANCELLED = "cancelled", "Cancelled"
-
-
-class PaymentStatus(models.TextChoices):
-    PENDING = "pending", "Pending"
-    PAID = "paid", "Paid"
-    FAILED = "failed", "Failed"
-    REFUNDED = "refunded", "Refunded"
-
-
-class SaleChannel(models.TextChoices):
-    DIRECT = "direct", "Direct"
-    MARKET = "market", "Market"
-    ONLINE = "online", "Online"
-    AUCTION = "auction", "Auction"
-    OTHER = "other", "Other"
-
-
-class Owner(models.Model):
-    owner_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=owner_id,
-        editable=False,
-        db_column="owner_ID",
+    # Override AbstractUser fields to avoid reverse accessor clashes with auth.User
+    groups = models.ManyToManyField(
+        'auth.Group',
+        verbose_name='groups',
+        blank=True,
+        related_name='cattletrace_user_set',
     )
-    national_id = models.CharField(max_length=100, unique=True)
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        verbose_name='user permissions',
+        blank=True,
+        related_name='cattletrace_user_set',
+    )
+
+    def __str__(self):
+        return f"{self.get_full_name()} ({self.role})"
+
+
+class Farm(models.Model):
+    """Registered farm / holding."""
+
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="farms")
     name = models.CharField(max_length=255)
-    phone_number = models.CharField(max_length=20, unique=True)
-    county = models.CharField(max_length=255)
-    sub_county = models.CharField(max_length=255)
-    owner_type = models.CharField(max_length=30, choices=OwnerType.choices)
+    registration_no = models.CharField(max_length=100, unique=True)
+    county = models.CharField(max_length=100)
+    sub_county = models.CharField(max_length=100, blank=True)
+    ward = models.CharField(max_length=100, blank=True)
+    gps_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    gps_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    total_area_acres = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.registration_no})"
+
+
+# ─────────────────────────────────────────────
+# 2. ANIMAL REGISTRATION & PROFILE
+# ─────────────────────────────────────────────
+
+class Breed(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Animal(models.Model):
+    """Core animal record — the traceability anchor."""
+
+    class Sex(models.TextChoices):
+        MALE = "M", "Male"
+        FEMALE = "F", "Female"
+
+    class Status(models.TextChoices):
+        ALIVE = "alive", "Alive"
+        SOLD = "sold", "Sold"
+        SLAUGHTERED = "slaughtered", "Slaughtered"
+        DECEASED = "deceased", "Deceased"
+        QUARANTINED = "quarantined", "Quarantined"
+
+    # Identity
+    tag_number = models.CharField(max_length=50, unique=True)
+    rfid_tag = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    name = models.CharField(max_length=100, blank=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    # Classification
+    breed = models.ForeignKey(Breed, on_delete=models.SET_NULL, null=True)
+    sex = models.CharField(max_length=1, choices=Sex.choices)
+    date_of_birth = models.DateField()
+    color = models.CharField(max_length=50, blank=True)
+    markings = models.TextField(blank=True, help_text="Physical distinguishing features")
+
+    # Ownership & location
+    current_owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="animals")
+    current_farm = models.ForeignKey(Farm, on_delete=models.SET_NULL, null=True, related_name="animals")
+
+    # Lineage
+    dam = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="calves_as_dam"
+    )
+    sire = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="calves_as_sire"
+    )
+
+    # Status
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ALIVE)
+    photo = models.ImageField(upload_to="animals/photos/", blank=True, null=True)
+
+    # Registration meta
+    registered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="registered_animals")
+    registration_date = models.DateField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "owners"
-        ordering = ["name"]
+        ordering = ["-registration_date"]
 
     def __str__(self):
-        return f"{self.name} ({self.owner_id})"
+        return f"{self.tag_number} — {self.breed} ({self.sex})"
 
-    def update_contact(self, phone_number=None, county=None, sub_county=None):
-        if phone_number:
-            self.phone_number = phone_number
-        if county:
-            self.county = county
-        if sub_county:
-            self.sub_county = sub_county
-        self.save()
-
-    def get_holdings(self):
-        return self.holdings.all()
-
-    def get_animals(self):
-        return self.animals.all()
+    @property
+    def age_months(self):
+        delta = timezone.now().date() - self.date_of_birth
+        return delta.days // 30
 
 
-class Holding(models.Model):
-    holding_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=holding_id,
-        editable=False,
-        db_column="holding_ID",
-    )
-    owner = models.ForeignKey(
-        Owner,
-        on_delete=models.CASCADE,
-        related_name="holdings",
-        db_column="owner_ID",
-    )
-    county = models.CharField(max_length=255)
-    sub_county = models.CharField(max_length=255)
-    ward = models.CharField(max_length=255)
-    gps_coordinates = models.CharField(max_length=100)
-    holding_type = models.CharField(max_length=30, choices=HoldingType.choices)
-    owner_type = models.CharField(max_length=30, choices=OwnerType.choices)
-    registered_at = models.DateTimeField(auto_now_add=True)
+class AnimalWeight(models.Model):
+    """Weight measurements over time."""
 
-    class Meta:
-        db_table = "holdings"
-        ordering = ["county", "sub_county", "ward", "holding_id"]
-
-    def __str__(self):
-        return f"{self.holding_id} - {self.county}, {self.sub_county}, {self.ward}"
-
-    def get_animals(self):
-        return self.current_animals.all()
-
-    def get_current_count(self):
-        return self.current_animals.count()
-
-
-class Animal(models.Model):
-    animal_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=animal_id,
-        editable=False,
-        db_column="animal_ID",
-    )
-    rfid_number = models.CharField(max_length=50, unique=True)
-    species = models.CharField(max_length=30, choices=Species.choices)
-    sex = models.CharField(max_length=10, choices=Sex.choices)
-    current_owner = models.ForeignKey(
-        Owner,
-        on_delete=models.PROTECT,
-        related_name="animals",
-        db_column="current_owner_ID",
-    )
-    current_holding = models.ForeignKey(
-        Holding,
-        on_delete=models.PROTECT,
-        related_name="current_animals",
-        db_column="current_holding_ID",
-    )
-    birth_holding = models.ForeignKey(
-        Holding,
-        on_delete=models.PROTECT,
-        related_name="born_animals",
-        db_column="birth_holding_ID",
-    )
-    age_class = models.CharField(max_length=30, choices=AgeClass.choices)
-    breed = models.CharField(max_length=255)
-    physical_description = models.CharField(max_length=255)
-    animal_status = models.CharField(
-        max_length=30,
-        choices=AnimalStatus.choices,
-        default=AnimalStatus.ACTIVE,
-    )
-    estimated_live_weight = models.FloatField()
-    photo = models.CharField(max_length=255, blank=True)
-    registered_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "animals"
-        ordering = ["rfid_number"]
-        permissions = (
-            ("upload_animal_photo", "Can upload animal photo"),
-        )
-
-    def __str__(self):
-        return f"{self.rfid_number} - {self.species}"
-
-    def transfer(self, new_owner, new_holding):
-        self.current_owner = new_owner
-        self.current_holding = new_holding
-        self.animal_status = AnimalStatus.TRANSFERRED
-        self.save(update_fields=["current_owner", "current_holding", "animal_status"])
-
-    def report_stolen(self):
-        self.animal_status = AnimalStatus.LOST
-        self.save(update_fields=["animal_status"])
-
-    def close_lifecycle(self, status=AnimalStatus.SLAUGHTERED):
-        self.animal_status = status
-        self.save(update_fields=["animal_status"])
-
-    def get_health_history(self):
-        return self.health_events.all()
-
-    def get_ownership_history(self):
-        return self.transactions.all()
-
-
-class AnimalHealthWorker(models.Model):
-    worker_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=worker_id,
-        editable=False,
-        db_column="worker_ID",
-    )
-    name = models.CharField(max_length=255)
-    dvs_number = models.CharField(max_length=50, unique=True)
-    phone_number = models.CharField(max_length=20, unique=True)
-    county = models.CharField(max_length=255)
-    sub_county = models.CharField(max_length=255)
-    worker_type = models.CharField(max_length=60)
-    verified = models.BooleanField(default=False)
-    assigned_zone = models.CharField(max_length=255)
-    registered_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "animal_health_workers"
-        ordering = ["name"]
-
-    def __str__(self):
-        return f"{self.name} ({self.worker_id})"
-
-    def record_health_event(self, **kwargs):
-        return HealthEvent.objects.create(recorded_by=self, **kwargs)
-
-    def escalate_to_vet(self, health_event):
-        health_event.notes = f"{health_event.notes}\nEscalated to vet.".strip()
-        health_event.save(update_fields=["notes"])
-
-    def get_event_history(self):
-        return self.health_events.all()
-
-
-class HealthEvent(models.Model):
-    event_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=health_event_id,
-        editable=False,
-        db_column="event_ID",
-    )
-    animal = models.ForeignKey(
-        Animal,
-        on_delete=models.CASCADE,
-        related_name="health_events",
-        db_column="animal_ID",
-    )
-    event_type = models.CharField(max_length=30, choices=EventType.choices)
-    disease_name = models.CharField(max_length=255, blank=True)
-    vaccine_name = models.CharField(max_length=255, blank=True)
-    treatment_given = models.CharField(max_length=255, blank=True)
-    cause_of_death = models.CharField(max_length=255, blank=True)
-    date_of_event = models.DateField()
-    recorded_by = models.ForeignKey(
-        AnimalHealthWorker,
-        on_delete=models.PROTECT,
-        related_name="health_events",
-        db_column="recorded_by",
-    )
-    credential_level = models.CharField(max_length=30, choices=CredentialLevel.choices)
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name="weights")
+    weight_kg = models.DecimalField(max_digits=7, decimal_places=2)
+    recorded_on = models.DateField(default=timezone.now)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     notes = models.TextField(blank=True)
-    registered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "health_events"
-        ordering = ["-date_of_event", "-registered_at"]
+        ordering = ["-recorded_on"]
 
     def __str__(self):
-        return f"{self.event_type} for {self.animal_id} on {self.date_of_event}"
-
-    def trigger_alert(self):
-        return self.event_type in {EventType.DISEASE, EventType.DEATH}
+        return f"{self.animal.tag_number}: {self.weight_kg} kg on {self.recorded_on}"
 
 
-class Transaction(models.Model):
-    transaction_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=transaction_id,
-        editable=False,
-        db_column="transaction_ID",
+# ─────────────────────────────────────────────
+# 3. HEALTH RECORDS
+# ─────────────────────────────────────────────
+
+class Disease(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    description = models.TextField(blank=True)
+    is_notifiable = models.BooleanField(default=False, help_text="Must be reported to authorities")
+
+    def __str__(self):
+        return self.name
+
+
+class Vaccine(models.Model):
+    name = models.CharField(max_length=150)
+    manufacturer = models.CharField(max_length=150, blank=True)
+    target_diseases = models.ManyToManyField(Disease, blank=True)
+    validity_days = models.PositiveIntegerField(default=365)
+
+    def __str__(self):
+        return self.name
+
+
+class HealthRecord(models.Model):
+    """Veterinary exam, treatment, or vaccination event."""
+
+    class RecordType(models.TextChoices):
+        VACCINATION = "vaccination", "Vaccination"
+        TREATMENT = "treatment", "Treatment"
+        EXAMINATION = "examination", "Examination"
+        DEWORMING = "deworming", "Deworming"
+        DIPPING = "dipping", "Dipping"
+        OTHER = "other", "Other"
+
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name="health_records")
+    record_type = models.CharField(max_length=20, choices=RecordType.choices)
+    date = models.DateField(default=timezone.now)
+    vet = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        limit_choices_to={"role": User.Role.VET}
     )
-    seller = models.ForeignKey(
-        Owner,
-        on_delete=models.PROTECT,
-        related_name="sales",
-        db_column="seller_ID",
-    )
-    buyer = models.ForeignKey(
-        Owner,
-        on_delete=models.PROTECT,
-        related_name="purchases",
-        db_column="buyer_ID",
-    )
-    animal = models.ForeignKey(
-        Animal,
-        on_delete=models.PROTECT,
-        related_name="transactions",
-        db_column="animal_ID",
-    )
-    asking_price = models.DecimalField(max_digits=12, decimal_places=2)
-    agreed_price = models.DecimalField(max_digits=12, decimal_places=2)
-    payment_status = models.CharField(
-        max_length=30,
-        choices=PaymentStatus.choices,
-        default=PaymentStatus.PENDING,
-    )
-    sale_channel = models.CharField(max_length=30, choices=SaleChannel.choices)
-    delivery_arrangement = models.CharField(max_length=255)
-    sale_date = models.DateField()
-    registered_at = models.DateTimeField(auto_now_add=True)
+    diagnosis = models.ForeignKey(Disease, on_delete=models.SET_NULL, null=True, blank=True)
+    vaccine_used = models.ForeignKey(Vaccine, on_delete=models.SET_NULL, null=True, blank=True)
+    medication = models.CharField(max_length=255, blank=True)
+    dosage = models.CharField(max_length=100, blank=True)
+    next_due_date = models.DateField(null=True, blank=True)
+    temperature = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
+    notes = models.TextField(blank=True)
+    certificate_no = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "transactions"
-        ordering = ["-sale_date", "-registered_at"]
+        ordering = ["-date"]
 
     def __str__(self):
-        return f"{self.transaction_id} - {self.animal_id}"
+        return f"{self.record_type} — {self.animal.tag_number} on {self.date}"
 
-    def make_offer(self, agreed_price):
-        self.agreed_price = agreed_price
-        self.save(update_fields=["agreed_price"])
 
-    def confirm_payment(self):
-        self.payment_status = PaymentStatus.PAID
-        self.save(update_fields=["payment_status"])
+# ─────────────────────────────────────────────
+# 4. MOVEMENT TRACKING
+# ─────────────────────────────────────────────
 
-    def trigger_transfer(self):
-        self.animal.transfer(self.buyer, self.animal.current_holding)
+class MovementPermit(models.Model):
+    """Official movement permit issued by authorities."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        EXPIRED = "expired", "Expired"
+
+    permit_number = models.CharField(max_length=100, unique=True)
+    issued_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        limit_choices_to={"role": User.Role.INSPECTOR},
+        related_name="permits_issued"
+    )
+    issued_on = models.DateField(default=timezone.now)
+    valid_until = models.DateField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Permit {self.permit_number} ({self.status})"
 
 
 class MovementRecord(models.Model):
-    movement_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=movement_id,
-        editable=False,
-        db_column="movement_ID",
+    """Each time an animal moves between farms/locations."""
+
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name="movements")
+    permit = models.ForeignKey(MovementPermit, on_delete=models.SET_NULL, null=True, blank=True)
+    origin_farm = models.ForeignKey(Farm, on_delete=models.SET_NULL, null=True, related_name="departures")
+    destination_farm = models.ForeignKey(Farm, on_delete=models.SET_NULL, null=True, related_name="arrivals")
+    origin_county = models.CharField(max_length=100)
+    destination_county = models.CharField(max_length=100)
+    move_date = models.DateField()
+    purpose = models.CharField(
+        max_length=50,
+        choices=[
+            ("sale", "Sale"),
+            ("grazing", "Grazing"),
+            ("breeding", "Breeding"),
+            ("slaughter", "Slaughter"),
+            ("exhibition", "Exhibition"),
+            ("other", "Other"),
+        ]
     )
-    animal = models.ForeignKey(
-        Animal,
-        on_delete=models.CASCADE,
-        related_name="movement_records",
-        to_field="rfid_number",
-        db_column="animal_rfid_number",
-    )
-    from_holding = models.ForeignKey(
-        Holding,
-        on_delete=models.PROTECT,
-        related_name="outgoing_movements",
-        db_column="from_holding_ID",
-    )
-    to_holding = models.ForeignKey(
-        Holding,
-        on_delete=models.PROTECT,
-        related_name="incoming_movements",
-        db_column="to_holding_ID",
-    )
-    movement_date = models.DateField()
-    purpose_of_movement = models.CharField(
-        max_length=30,
-        choices=MovementPurpose.choices,
-    )
-    country_crossing = models.BooleanField(default=False)
-    permit_number = models.CharField(max_length=100, blank=True)
-    movement_status = models.CharField(
-        max_length=30,
-        choices=MovementStatus.choices,
-        default=MovementStatus.PENDING,
-    )
-    linked_transaction = models.ForeignKey(
-        Transaction,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="movement_records",
-        db_column="linked_transaction_ID",
-    )
+    transporter = models.CharField(max_length=255, blank=True)
+    vehicle_reg = models.CharField(max_length=50, blank=True)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    gps_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    gps_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "movement_records"
-        ordering = ["-movement_date", "-created_at"]
+        ordering = ["-move_date"]
 
     def __str__(self):
-        return f"{self.animal_id}: {self.from_holding_id} to {self.to_holding_id}"
+        return f"{self.animal.tag_number}: {self.origin_county} → {self.destination_county} on {self.move_date}"
 
-    def attach_permit(self, permit_number):
-        self.permit_number = permit_number
-        self.save(update_fields=["permit_number"])
 
-    def confirm(self):
-        self.movement_status = MovementStatus.COMPLETED
-        self.save(update_fields=["movement_status"])
-
+# ─────────────────────────────────────────────
+# 5. SLAUGHTER RECORDS
+# ─────────────────────────────────────────────
 
 class Abattoir(models.Model):
-    abattoir_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=abattoir_id,
-        editable=False,
-        db_column="abattoir_ID",
-    )
-    license_number = models.CharField(max_length=50, unique=True)
-    holding = models.ForeignKey(
-        Holding,
-        on_delete=models.PROTECT,
-        related_name="abattoirs",
-        db_column="holding_ID",
-    )
-    county = models.CharField(max_length=255)
-    sub_county = models.CharField(max_length=255)
-    phone_number = models.CharField(max_length=20)
-    registered_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "abattoirs"
-        ordering = ["abattoir_id"]
+    name = models.CharField(max_length=255)
+    license_no = models.CharField(max_length=100, unique=True)
+    county = models.CharField(max_length=100)
+    address = models.TextField(blank=True)
+    contact = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.abattoir_id} - {self.license_number}"
-
-    def get_slaughter_history(self):
-        return self.slaughter_records.all()
-
-    def get_batch_report(self, batch_number):
-        return self.slaughter_records.filter(batch_number=batch_number)
-
-    def verify_incoming_animal(self, animal):
-        return animal.current_holding_id == self.holding_id
+        return f"{self.name} ({self.license_no})"
 
 
 class SlaughterRecord(models.Model):
-    slaughter_record_id = models.CharField(
-        max_length=30,
-        primary_key=True,
-        default=slaughter_record_id,
-        editable=False,
-        db_column="slaughter_record_ID",
+    # CattleTrace/models.py, add to SlaughterRecord Meta class
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['animal'], name='one_slaughter_per_animal')
+        ]
+    """Post-mortem & carcass record."""
+
+    class InspectionResult(models.TextChoices):
+        PASSED = "passed", "Passed"
+        PASSED_PARTIAL = "passed_partial", "Passed (Partial Condemnation)"
+        CONDEMNED = "condemned", "Condemned"
+
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name="slaughter_records")
+    abattoir = models.ForeignKey(Abattoir, on_delete=models.SET_NULL, null=True)
+    slaughter_date = models.DateField()
+    slaughter_no = models.CharField(max_length=100, unique=True)
+
+    # Carcass data
+    live_weight_kg = models.DecimalField(max_digits=7, decimal_places=2)
+    carcass_weight_kg = models.DecimalField(max_digits=7, decimal_places=2)
+    hide_weight_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    offal_weight_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
+    # Inspection
+    inspector = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        limit_choices_to={"role": User.Role.INSPECTOR}
     )
-    animal = models.ForeignKey(
-        Animal,
-        on_delete=models.PROTECT,
-        related_name="slaughter_records",
-        db_column="animal_ID",
+    inspection_result = models.CharField(max_length=20, choices=InspectionResult.choices)
+    condemnation_reason = models.TextField(blank=True)
+    meat_grade = models.CharField(max_length=10, blank=True)
+
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Slaughter {self.slaughter_no} — {self.animal.tag_number}"
+
+    @property
+    def dressing_percentage(self):
+        if self.live_weight_kg:
+            return round((self.carcass_weight_kg / self.live_weight_kg) * 100, 2)
+        return None
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Update animal status automatically
+        self.animal.status = Animal.Status.SLAUGHTERED
+        self.animal.save(update_fields=["status"])
+
+
+# ─────────────────────────────────────────────
+# 6. MARKETPLACE
+# ─────────────────────────────────────────────
+
+class MarketplaceListing(models.Model):
+    """Animal listed for sale on the marketplace."""
+
+    class ListingStatus(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SOLD = "sold", "Sold"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+        EXPIRED = "expired", "Expired"
+
+    animal = models.OneToOneField(
+        Animal, on_delete=models.CASCADE, related_name="marketplace_listing"
     )
-    abattoir = models.ForeignKey(
-        Abattoir,
-        on_delete=models.PROTECT,
-        related_name="slaughter_records",
-        db_column="abattoir_ID",
+    seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name="listings")
+    asking_price = models.DecimalField(max_digits=12, decimal_places=2)
+    is_negotiable = models.BooleanField(default=True)
+    description = models.TextField(blank=True)
+    location_county = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=ListingStatus.choices, default=ListingStatus.ACTIVE)
+    listed_on = models.DateTimeField(auto_now_add=True)
+    expires_on = models.DateField(null=True, blank=True)
+    views_count = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-listed_on"]
+
+    def __str__(self):
+        return f"Listing: {self.animal.tag_number} @ KES {self.asking_price}"
+
+
+class ListingImage(models.Model):
+    listing = models.ForeignKey(MarketplaceListing, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="marketplace/images/")
+    caption = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_primary = models.BooleanField(default=False)
+
+
+class MarketplaceInquiry(models.Model):
+    """Message sent by a buyer about a listing."""
+
+    listing = models.ForeignKey(MarketplaceListing, on_delete=models.CASCADE, related_name="inquiries")
+    buyer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="inquiries")
+    message = models.TextField()
+    offer_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-sent_at"]
+
+    def __str__(self):
+        return f"Inquiry from {self.buyer} on {self.listing}"
+
+
+class Transaction(models.Model):
+    """Completed sale record."""
+
+    class PaymentMethod(models.TextChoices):
+        MPESA = "mpesa", "M-Pesa"
+        BANK = "bank", "Bank Transfer"
+        CASH = "cash", "Cash"
+        OTHER = "other", "Other"
+
+    listing = models.OneToOneField(MarketplaceListing, on_delete=models.CASCADE, related_name="transaction")
+    buyer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="purchases")
+    seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sales")
+    agreed_price = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
+    payment_ref = models.CharField(max_length=100, blank=True)
+    transaction_date = models.DateTimeField(default=timezone.now)
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Sale: {self.listing.animal.tag_number} — KES {self.agreed_price}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Mark listing & animal as sold
+        self.listing.status = MarketplaceListing.ListingStatus.SOLD
+        self.listing.save(update_fields=["status"])
+        animal = self.listing.animal
+        animal.status = Animal.Status.SOLD
+        animal.current_owner = self.buyer
+        animal.save(update_fields=["status", "current_owner"])
+
+
+# ─────────────────────────────────────────────
+# 7. NOTIFICATIONS
+# ─────────────────────────────────────────────
+
+class Notification(models.Model):
+    """In-app notifications for all users."""
+
+    class NotificationType(models.TextChoices):
+        HEALTH_DUE = "health_due", "Health Check Due"
+        VACCINATION_DUE = "vaccination_due", "Vaccination Due"
+        MOVEMENT_APPROVED = "movement_approved", "Movement Permit Approved"
+        MOVEMENT_REJECTED = "movement_rejected", "Movement Permit Rejected"
+        LISTING_INQUIRY = "listing_inquiry", "New Marketplace Inquiry"
+        LISTING_SOLD = "listing_sold", "Animal Sold"
+        DISEASE_ALERT = "disease_alert", "Disease Outbreak Alert"
+        SYSTEM = "system", "System Notification"
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    notification_type = models.CharField(max_length=30, choices=NotificationType.choices)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    related_animal = models.ForeignKey(Animal, on_delete=models.SET_NULL, null=True, blank=True)
+    related_listing = models.ForeignKey(
+        MarketplaceListing, on_delete=models.SET_NULL, null=True, blank=True
     )
-    last_holding = models.ForeignKey(
-        Holding,
-        on_delete=models.PROTECT,
-        related_name="slaughter_records",
-        db_column="last_holding_ID",
-    )
-    chain_number = models.CharField(max_length=80)
-    carcass_feedback = models.CharField(max_length=255)
-    batch_number = models.CharField(max_length=255)
-    date_of_slaughter = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "slaughter_records"
-        ordering = ["-date_of_slaughter", "-created_at"]
+        ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.slaughter_record_id} - {self.animal_id}"
+        return f"[{self.notification_type}] → {self.recipient}: {self.title}"
 
-    def attach_carcass_feedback(self, feedback):
-        self.carcass_feedback = feedback
-        self.save(update_fields=["carcass_feedback"])
+    def mark_read(self):
+        self.is_read = True
+        self.save(update_fields=["is_read"])
 
-    def get_batch_animals(self):
-        return SlaughterRecord.objects.filter(batch_number=self.batch_number)
 
-    def notify_last_owner(self):
-        return self.animal.current_owner
+# ─────────────────────────────────────────────
+# 8. REPORTS & ANALYTICS (supporting models)
+# ─────────────────────────────────────────────
+
+class DiseaseOutbreak(models.Model):
+    """Reported disease outbreak in a county."""
+
+    class Severity(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+        CRITICAL = "critical", "Critical"
+
+    disease = models.ForeignKey(Disease, on_delete=models.CASCADE)
+    county = models.CharField(max_length=100)
+    reported_on = models.DateField(default=timezone.now)
+    resolved_on = models.DateField(null=True, blank=True)
+    severity = models.CharField(max_length=10, choices=Severity.choices)
+    animals_affected = models.PositiveIntegerField(default=0)
+    animals_deaths = models.PositiveIntegerField(default=0)
+    reported_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.disease} outbreak in {self.county} ({self.reported_on})"
+
+
+class AuditLog(models.Model):
+    """Immutable audit trail for traceability compliance."""
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    action = models.CharField(max_length=100)  # e.g. "animal.create", "movement.approve"
+    model_name = models.CharField(max_length=100)
+    object_id = models.CharField(max_length=50)
+    changes = models.JSONField(default=dict)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.timestamp}: {self.user} — {self.action} on {self.model_name}#{self.object_id}"
+
