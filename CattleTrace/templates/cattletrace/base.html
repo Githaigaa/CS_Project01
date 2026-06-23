@@ -1,0 +1,52 @@
+﻿{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}CattleTrace{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'cattletrace/css/cattletrace.css' %}">
+    <script defer src="{% static 'cattletrace/js/cattletrace.js' %}"></script>
+</head>
+<body class="app-body">
+    <button class="mobile-menu-button" type="button" data-mobile-menu aria-label="Open navigation"><span></span><span></span><span></span></button>
+    <div class="mobile-overlay" data-mobile-overlay></div>
+    <div class="app-shell">
+        <aside class="sidebar" data-sidebar>
+            <div class="sidebar-header">
+                <a class="brand" href="{% url 'CattleTrace:dashboard' %}">
+                    <span class="brand-icon">CT</span>
+                    <span class="brand-copy"><strong>CattleTrace</strong><small>{% if request.user.is_authenticated %}{{ request.user.get_role_display|default:'Farmer' }}{% else %}Traceability{% endif %}</small></span>
+                </a>
+                <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Collapse navigation">☰</button>
+            </div>
+            <nav class="sidebar-nav">
+                <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'CattleTrace:dashboard' %}"><span>⌂</span><em>Dashboard</em></a>
+                <a class="nav-item {% if 'animal' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:animal-list' %}"><span>🐂</span><em>Animals</em></a>
+                <a class="nav-item {% if 'farm' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:farm-list' %}"><span>⌖</span><em>Holdings</em></a>
+                <a class="nav-item {% if 'marketplace' in request.resolver_match.url_name or 'listing' in request.resolver_match.url_name or 'inquir' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:marketplace-home' %}"><span>▣</span><em>Marketplace</em></a>
+                <a class="nav-item {% if 'movement' in request.resolver_match.url_name or 'permit' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:movement-list' %}"><span>↗</span><em>Movements</em></a>
+                <a class="nav-item {% if 'health' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:report-health' %}"><span>♡</span><em>Health Records</em></a>
+                <a class="nav-item {% if 'transaction' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:my-listings' %}"><span>₭</span><em>Transactions</em></a>
+                <a class="nav-item {% if 'slaughter' in request.resolver_match.url_name or 'abattoir' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:slaughter-list' %}"><span>▦</span><em>Abattoirs</em></a>
+                <a class="nav-item {% if 'report' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:reports-home' %}"><span>▤</span><em>Reports</em></a>
+                <a class="nav-item {% if 'notification' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:notification-list' %}"><span>●</span><em>Notifications</em></a>
+            </nav>
+            <div class="sidebar-footer">
+                <a class="nav-item {% if 'profile' in request.resolver_match.url_name or 'password' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'CattleTrace:profile' %}"><span>◎</span><em>Profile</em></a>
+                <a class="nav-item" href="/admin/"><span>⚙</span><em>Admin</em></a>
+            </div>
+        </aside>
+        <div class="main-shell">
+            <header class="top-nav">
+                <form class="top-search" method="get" action=""><span>⌕</span><input type="search" name="q" value="{{ request.GET.q }}" placeholder="Search animals, RFID, owners..."></form>
+                <div class="top-actions"><button class="icon-button" type="button" title="Scan QR">▣</button><button class="icon-button" type="button" data-theme-toggle title="Toggle theme">☾</button><a class="icon-button notification-dot" href="{% url 'CattleTrace:notification-list' %}" title="Notifications">●</a><a class="avatar-button" href="{% url 'CattleTrace:profile' %}" title="Profile">{% if request.user.is_authenticated %}{{ request.user.username|first|upper }}{% else %}U{% endif %}</a></div>
+            </header>
+            <main class="content-shell">
+                {% if messages %}<div class="message-stack">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+</body>
+</html>
