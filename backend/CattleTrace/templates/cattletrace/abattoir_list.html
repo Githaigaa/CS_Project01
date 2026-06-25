@@ -1,0 +1,20 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Abattoirs | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>Abattoirs</h1>
+   <p>Registered slaughter facilities</p>
+</section>
+<section class="card-list">
+   {% for abattoir in abattoirs %}
+   <article class="card holding-card">
+      <div class="card-icon secondary">▦</div>
+      <div>
+         <h2>{{ abattoir.name }}</h2>
+         <p>{{ abattoir.county }} • {{ abattoir.license_no }}</p>
+         <span class="badge success">{% if abattoir.is_active %}Active{% else %}Inactive{% endif %}</span>
+      </div>
+   </article>
+   {% empty %}
+   <article class="card empty-state">No abattoirs registered.</article>
+   {% endfor %}
+</section>
+{% endblock %}

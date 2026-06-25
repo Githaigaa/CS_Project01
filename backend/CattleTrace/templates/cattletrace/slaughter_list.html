@@ -1,0 +1,44 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Slaughter Records | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>Abattoir Management</h1>
+   <p>Manage slaughter facilities and processing records</p>
+</section>
+<section class="mini-stats">
+   <article class="card"><small>Animals Received</small><strong>{{ records|length }}</strong></article>
+   <article class="card"><small>Slaughtered Today</small><strong>0</strong></article>
+   <article class="card"><small>Pending Verification</small><strong>0</strong></article>
+   <article class="card"><small>Compliance Rate</small><strong>98.5%</strong></article>
+</section>
+<section class="card table-card">
+   <table class="data-table">
+      <thead>
+         <tr>
+            <th>Animal</th>
+            <th>Abattoir</th>
+            <th>Slaughter No</th>
+            <th>Date</th>
+            <th>Inspection</th>
+            <th>Actions</th>
+         </tr>
+      </thead>
+      <tbody>
+         {% for record in records %}
+         <tr>
+            <td>{{ record.animal }}</td>
+            <td>{{ record.abattoir }}</td>
+            <td class="mono">{{ record.slaughter_no }}</td>
+            <td>{{ record.slaughter_date }}</td>
+            <td><span class="badge success">{{ record.get_inspection_result_display }}</span></td>
+            <td><a class="icon-link" href="{% url 'CattleTrace:slaughter-detail' record.pk %}">View Chain</a></td>
+         </tr>
+         {% empty %}
+         <tr>
+            <td colspan="6">
+               <div class="empty-state">No slaughter records yet.</div>
+            </td>
+         </tr>
+         {% endfor %}
+      </tbody>
+   </table>
+</section>
+{% endblock %}

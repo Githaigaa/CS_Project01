@@ -1,0 +1,46 @@
+{% extends 'cattletrace/base.html' %}
+
+{% block title %}Records | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-header split">
+    <div>
+        <h1>{{ config.title|default:'Records' }}</h1>
+        <p>{{ config.subtitle|default:'Browse and manage CattleTrace records.' }}</p>
+    </div>
+    {% if create_url %}<a class="button primary" href="{{ create_url }}">+ New Record</a>{% endif %}
+</section>
+
+<section class="card toolbar">
+    <form method="get" class="filter-row">
+        <input class="input" name="q" value="{{ query }}" placeholder="Search records...">
+        <button class="button outline" type="submit">Filter</button>
+        <a class="button ghost" href="?format=json">JSON</a>
+    </form>
+</section>
+
+<section class="card table-card">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    {% for header in headers %}<th>{{ header }}</th>{% endfor %}
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        {% for cell in row.cells %}
+                            <td>{% if cell.is_badge %}<span class="badge {{ cell.badge_class }}">{{ cell.value }}</span>{% else %}{{ cell.value }}{% endif %}</td>
+                        {% endfor %}
+                        <td><a class="icon-link" href="{{ row.detail_url }}">View</a> <a class="icon-link" href="{{ row.update_url }}">Edit</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="20"><div class="empty-state">No records found.</div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'cattletrace/base.html' %}
+
+{% block title %}Record Form | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>{{ form_title|default:'Record Form' }}</h1>
+    <p>{{ config.subtitle|default:'Complete the traceability record fields below.' }}</p>
+</section>
+
+<section class="card">
+    <form method="post" class="form-grid" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+            <label class="{% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}">
+                {{ field.label }}
+                {{ field }}
+                {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+            </label>
+        {% empty %}
+            <label>Reference<input class="input" name="reference" placeholder="Enter reference"></label>
+            <label>Date<input class="input" type="date" name="date"></label>
+            <label class="full">Notes<textarea class="input" name="notes" placeholder="Additional details"></textarea></label>
+        {% endfor %}
+        <div class="form-actions full">
+            {% if cancel_url %}<a class="button outline" href="{{ cancel_url }}">Cancel</a>{% endif %}
+            <button class="button primary" type="submit">{{ submit_label|default:'Save Record' }}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

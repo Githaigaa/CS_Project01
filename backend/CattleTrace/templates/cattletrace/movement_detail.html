@@ -1,0 +1,14 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Movement Detail | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>Movement Detail</h1>
+   <p>{{ movement.animal }} movement record</p>
+</section>
+<section class="detail-grid card">
+   <div><small>Animal</small><strong>{{ movement.animal }}</strong></div>
+   <div><small>Permit</small><strong>{{ movement.permit|default:'-' }}</strong></div>
+   <div><small>Origin</small><strong>{{ movement.origin_county }}</strong></div>
+   <div><small>Destination</small><strong>{{ movement.destination_county }}</strong></div>
+   <div><small>Date</small><strong>{{ movement.move_date }}</strong></div>
+   <div><small>Purpose</small><strong>{{ movement.get_purpose_display }}</strong></div>
+</section>
+{% endblock %}

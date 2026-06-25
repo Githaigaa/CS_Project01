@@ -1,0 +1,24 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Notifications | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>Notifications</h1>
+      <p>System alerts and traceability updates</p>
+   </div>
+   <a class="button outline" href="{% url 'CattleTrace:notification-mark-all-read' %}">Mark all read</a>
+</section>
+<section class="activity-list">
+   {% for notification in notifications %}
+   <article class="card movement-card">
+      <div class="card-icon {% if notification.is_read %}secondary{% else %}danger{% endif %}">●</div>
+      <div>
+         <h2>{{ notification.title }}</h2>
+         <p>{{ notification.message }}</p>
+         <p class="muted">{{ notification.created_at }}</p>
+      </div>
+      <a class="button outline small" href="{% url 'CattleTrace:notification-detail' notification.pk %}">Open</a>
+   </article>
+   {% empty %}
+   <article class="card empty-state">No notifications.</article>
+   {% endfor %}
+</section>
+{% endblock %}

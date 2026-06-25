@@ -1,0 +1,24 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Health Records | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>Health Records</h1>
+      <p>{{ animal }} veterinary history</p>
+   </div>
+   <a class="button primary" href="{% url 'CattleTrace:health-add' animal.tag_number %}">+ Add Record</a>
+</section>
+<section class="activity-list">
+   {% for record in records %}
+   <article class="card movement-card">
+      <div class="card-icon success">♡</div>
+      <div>
+         <h2>{{ record.get_record_type_display }}</h2>
+         <p>{{ record.date }} • {{ record.vet|default:'-' }}</p>
+         <p class="muted">{{ record.notes|default:'No notes' }}</p>
+      </div>
+      <a class="button outline small" href="{% url 'CattleTrace:health-detail' animal.tag_number record.pk %}">View</a>
+   </article>
+   {% empty %}
+   <article class="card empty-state">No health records for this animal.</article>
+   {% endfor %}
+</section>
+{% endblock %}

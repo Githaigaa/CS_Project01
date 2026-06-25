@@ -1,0 +1,35 @@
+{% extends 'cattletrace/base.html' %}
+
+{% block title %}Record Detail | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-header split">
+    <div>
+        <h1>{{ config.title|default:'Record' }} Detail</h1>
+        <p>Review this traceability record.</p>
+    </div>
+    <div class="button-row">
+        {% if list_url %}<a class="button outline" href="{{ list_url }}">Back</a>{% endif %}
+        {% if update_url %}<a class="button primary" href="{{ update_url }}">Edit</a>{% endif %}
+    </div>
+</section>
+
+<section class="detail-grid card">
+    {% for field in fields %}
+        <div><small>{{ field.label }}</small><strong>{{ field.value }}</strong></div>
+    {% empty %}
+        <div><small>Status</small><strong>No details available.</strong></div>
+    {% endfor %}
+</section>
+
+{% if delete_url %}
+<section class="card danger-card">
+    <h2>Danger Zone</h2>
+    <p class="muted">Deleting this record may affect traceability history.</p>
+    <form method="post" action="{{ delete_url }}">
+        {% csrf_token %}
+        <button class="button danger" type="submit">Delete Record</button>
+    </form>
+</section>
+{% endif %}
+{% endblock %}

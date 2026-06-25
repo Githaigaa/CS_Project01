@@ -1,0 +1,14 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Permit Approve Confirm | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>Permit Approve Confirm</h1>
+   <p>This action requires confirmation.</p>
+</section>
+<section class="card danger-card">
+   <h2>Confirm Action</h2>
+   <p>Review this record carefully before continuing.</p>
+   <form method="post">
+      {% csrf_token %}
+      <div class="button-row"><button class="button danger" type="submit">Confirm</button><button class="button outline" type="button" onclick="history.back()">Cancel</button></div>
+   </form>
+</section>
+{% endblock %}

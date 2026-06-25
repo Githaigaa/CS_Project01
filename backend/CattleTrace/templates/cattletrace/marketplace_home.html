@@ -1,0 +1,24 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Marketplace | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>Livestock Marketplace</h1>
+      <p>Buy and sell animals with verified traceability records</p>
+   </div>
+   <a class="button primary" href="{% url 'CattleTrace:listing-create' %}">+ Create Listing</a>
+</section>
+<section class="market-grid">
+   {% for listing in listings %}
+   <article class="card listing-card">
+      <div class="listing-photo">🐂</div>
+      <div class="listing-body">
+         <h2>{{ listing.animal }}</h2>
+         <p>{{ listing.description|default:'Verified livestock listing' }}</p>
+         <strong>KES {{ listing.asking_price }}</strong>
+         <div class="button-row"><a class="button primary small" href="{% url 'CattleTrace:listing-detail' listing.pk %}">View Listing</a><a class="button outline small" href="{% url 'CattleTrace:inquiry-send' listing.pk %}">Inquire</a></div>
+      </div>
+   </article>
+   {% empty %}
+   <article class="card empty-state">No active marketplace listings.</article>
+   {% endfor %}
+</section>
+{% endblock %}

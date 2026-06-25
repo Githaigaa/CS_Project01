@@ -1,0 +1,41 @@
+{% extends 'cattletrace/base.html' %}
+
+{% block title %}Profile | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-header split">
+    <div>
+        <h1>Profile</h1>
+        <p>Manage your CattleTrace account and platform role.</p>
+    </div>
+    <div class="button-row">
+        <a class="button outline" href="{% url 'CattleTrace:change-password' %}">Change Password</a>
+        <a class="button primary" href="{% url 'CattleTrace:profile-edit' %}">Edit Profile</a>
+    </div>
+</section>
+
+<section class="profile-grid">
+    <article class="card profile-hero">
+        <div class="animal-photo">◎</div>
+        <div>
+            <h2>{{ user.get_full_name|default:user.username }}</h2>
+            <p>{{ user.email|default:'No email set' }}</p>
+            <span class="badge success">{{ user.get_role_display|default:'User' }}</span>
+        </div>
+    </article>
+    <article class="card">
+        <h2>Verification</h2>
+        <div class="score-ring">{% if user.is_verified %}OK{% else %}--{% endif %}</div>
+        <p class="muted">{% if user.is_verified %}Account verified{% else %}Verification pending{% endif %}</p>
+    </article>
+</section>
+
+<section class="detail-grid card">
+    <div><small>Username</small><strong>{{ user.username }}</strong></div>
+    <div><small>Phone Number</small><strong>{{ user.phone_number|default:'-' }}</strong></div>
+    <div><small>National ID</small><strong>{{ user.national_id|default:'-' }}</strong></div>
+    <div><small>Location</small><strong>{{ user.location|default:'-' }}</strong></div>
+    <div><small>Joined</small><strong>{{ user.date_joined|date:'M d, Y' }}</strong></div>
+    <div><small>Status</small><strong>{% if user.is_active %}Active{% else %}Inactive{% endif %}</strong></div>
+</section>
+{% endblock %}

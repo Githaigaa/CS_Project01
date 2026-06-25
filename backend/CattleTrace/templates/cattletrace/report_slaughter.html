@@ -1,0 +1,18 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Report Slaughter | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>Report Slaughter</h1>
+      <p>Analytics and compliance summary</p>
+   </div>
+   <button class="button outline" type="button">Export</button>
+</section>
+<section class="mini-stats">
+   <article class="card"><small>Total</small><strong>{{ total_animals|default:0 }}</strong></article>
+   <article class="card"><small>Active</small><strong>{{ by_status.alive|default:0 }}</strong></article>
+   <article class="card"><small>Reviewed</small><strong>0</strong></article>
+   <article class="card"><small>Compliance</small><strong>98%</strong></article>
+</section>
+<section class="card">
+   <div class="fake-chart bars"><span style="height:40%"></span><span style="height:64%"></span><span style="height:52%"></span><span style="height:78%"></span><span style="height:58%"></span></div>
+</section>
+{% endblock %}

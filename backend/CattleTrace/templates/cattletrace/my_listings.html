@@ -1,0 +1,24 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}My Listings | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>My Listings</h1>
+      <p>Manage your marketplace animals</p>
+   </div>
+   <a class="button primary" href="{% url 'CattleTrace:listing-create' %}">+ New Listing</a>
+</section>
+<section class="market-grid">
+   {% for listing in listings %}
+   <article class="card listing-card">
+      <div class="listing-photo">🐂</div>
+      <div class="listing-body">
+         <h2>{{ listing.animal }}</h2>
+         <strong>KES {{ listing.asking_price }}</strong>
+         <p>{{ listing.get_status_display }}</p>
+         <div class="button-row"><a class="button outline small" href="{% url 'CattleTrace:listing-edit' listing.pk %}">Edit</a><a class="button danger small" href="{% url 'CattleTrace:listing-delete' listing.pk %}">Delete</a></div>
+      </div>
+   </article>
+   {% empty %}
+   <article class="card empty-state">You have no listings.</article>
+   {% endfor %}
+</section>
+{% endblock %}

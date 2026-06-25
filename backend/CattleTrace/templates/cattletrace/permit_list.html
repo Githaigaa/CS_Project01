@@ -1,0 +1,39 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Movement Permits | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>Movement Permits</h1>
+      <p>Permit approvals and transport compliance</p>
+   </div>
+   <a class="button primary" href="{% url 'CattleTrace:permit-request' %}">Request Permit</a>
+</section>
+<section class="card table-card">
+   <table class="data-table">
+      <thead>
+         <tr>
+            <th>Permit</th>
+            <th>Status</th>
+            <th>Issued By</th>
+            <th>Valid Until</th>
+            <th>Actions</th>
+         </tr>
+      </thead>
+      <tbody>
+         {% for permit in permits %}
+         <tr>
+            <td class="mono">{{ permit.permit_number }}</td>
+            <td><span class="badge warning">{{ permit.get_status_display }}</span></td>
+            <td>{{ permit.issued_by|default:'-' }}</td>
+            <td>{{ permit.valid_until }}</td>
+            <td><a class="icon-link" href="{% url 'CattleTrace:permit-detail' permit.pk %}">View</a></td>
+         </tr>
+         {% empty %}
+         <tr>
+            <td colspan="5">
+               <div class="empty-state">No permits found.</div>
+            </td>
+         </tr>
+         {% endfor %}
+      </tbody>
+   </table>
+</section>
+{% endblock %}

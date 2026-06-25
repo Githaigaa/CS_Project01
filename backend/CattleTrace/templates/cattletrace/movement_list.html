@@ -1,0 +1,34 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Movements | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>Animal Movement Tracking</h1>
+      <p>Monitor and manage livestock movements between holdings</p>
+   </div>
+   <a class="button primary" href="{% url 'CattleTrace:permit-request' %}">+ Request Permit</a>
+</section>
+<section class="mini-stats">
+   <article class="card"><small>Total Movements</small><strong>{{ movements|length }}</strong></article>
+   <article class="card"><small>Pending</small><strong>0</strong></article>
+   <article class="card"><small>In Transit</small><strong>0</strong></article>
+   <article class="card"><small>Completed</small><strong>0</strong></article>
+</section>
+<section class="card map-card">
+   <h2>Movement Route Visualization</h2>
+   <div class="map-placeholder">⌖ Interactive map showing movement routes and real-time tracking</div>
+</section>
+<section class="activity-list">
+   {% for movement in movements %}
+   <article class="card movement-card">
+      <div class="card-icon warning">↗</div>
+      <div>
+         <h2>RFID: {{ movement.animal.tag_number }}</h2>
+         <p>{{ movement.origin_county }} → {{ movement.destination_county }}</p>
+         <p class="muted">{{ movement.move_date }} • {{ movement.get_purpose_display }}</p>
+      </div>
+      <a class="button outline small" href="{% url 'CattleTrace:movement-detail' movement.pk %}">View Details</a>
+   </article>
+   {% empty %}
+   <article class="card empty-state">No movement records yet.</article>
+   {% endfor %}
+</section>
+{% endblock %}

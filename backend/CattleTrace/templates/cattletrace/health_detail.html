@@ -1,0 +1,18 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Health Detail | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>{{ record.get_record_type_display }}</h1>
+   <p>Health event for {{ animal }}</p>
+</section>
+<section class="detail-grid card">
+   <div><small>Date</small><strong>{{ record.date }}</strong></div>
+   <div><small>Veterinarian</small><strong>{{ record.vet|default:'-' }}</strong></div>
+   <div><small>Diagnosis</small><strong>{{ record.diagnosis|default:'-' }}</strong></div>
+   <div><small>Vaccine</small><strong>{{ record.vaccine_used|default:'-' }}</strong></div>
+   <div><small>Medication</small><strong>{{ record.medication|default:'-' }}</strong></div>
+   <div><small>Next Due</small><strong>{{ record.next_due_date|default:'-' }}</strong></div>
+</section>
+<section class="card">
+   <h2>Notes</h2>
+   <p>{{ record.notes|default:'No notes recorded.' }}</p>
+</section>
+{% endblock %}

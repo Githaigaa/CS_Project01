@@ -1,0 +1,21 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Listing Detail | CattleTrace{% endblock %}{% block content %}
+<section class="page-header split">
+   <div>
+      <h1>{{ listing.animal }}</h1>
+      <p>Verified marketplace listing</p>
+   </div>
+   <a class="button primary" href="{% url 'CattleTrace:transaction-create' listing.pk %}">Purchase</a>
+</section>
+<section class="profile-grid">
+   <article class="card listing-photo large">🐂</article>
+   <article class="card">
+      <h2>KES {{ listing.asking_price }}</h2>
+      <p>{{ listing.description }}</p>
+      <div class="detail-list">
+         <p><strong>Seller:</strong> {{ listing.seller }}</p>
+         <p><strong>County:</strong> {{ listing.location_county }}</p>
+         <p><strong>Status:</strong> <span class="badge success">{{ listing.get_status_display }}</span></p>
+      </div>
+   </article>
+</section>
+{% endblock %}

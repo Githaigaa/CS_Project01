@@ -1,0 +1,12 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Slaughter Add | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>Slaughter Add</h1>
+   <p>Complete the fields below to continue.</p>
+</section>
+<section class="card">
+   <form method="post" class="form-grid">
+      {% csrf_token %}<label>Reference<input class="input" name="reference" placeholder="Enter reference"></label><label>Date<input class="input" type="date" name="date"></label><label class="full">Notes<textarea class="input" name="notes" placeholder="Additional details"></textarea></label>
+      <div class="form-actions full"><button class="button primary" type="submit">Submit</button><button class="button outline" type="button" onclick="history.back()">Cancel</button></div>
+   </form>
+</section>
+{% endblock %}

@@ -1,0 +1,16 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Permit Detail | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>Permit {{ permit.permit_number }}</h1>
+   <p>Movement authorization details</p>
+</section>
+<section class="detail-grid card">
+   <div><small>Status</small><strong>{{ permit.get_status_display }}</strong></div>
+   <div><small>Issued By</small><strong>{{ permit.issued_by|default:'-' }}</strong></div>
+   <div><small>Issued On</small><strong>{{ permit.issued_on }}</strong></div>
+   <div><small>Valid Until</small><strong>{{ permit.valid_until }}</strong></div>
+</section>
+<section class="card">
+   <h2>Notes</h2>
+   <p>{{ permit.notes|default:'No notes.' }}</p>
+</section>
+{% endblock %}

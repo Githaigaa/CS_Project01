@@ -1,0 +1,10 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Notification | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>{{ notification.title }}</h1>
+   <p>{{ notification.get_notification_type_display }}</p>
+</section>
+<section class="card">
+   <p>{{ notification.message }}</p>
+   <p class="muted">{{ notification.created_at }}</p>
+</section>
+{% endblock %}

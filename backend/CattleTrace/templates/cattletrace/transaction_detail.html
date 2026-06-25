@@ -1,0 +1,39 @@
+{% extends 'cattletrace/base.html' %}
+
+{% block title %}Transaction Detail | CattleTrace{% endblock %}
+
+{% block content %}
+<section class="page-header split">
+    <div>
+        <h1>Transaction Detail</h1>
+        <p>Completed livestock sale and ownership transfer record.</p>
+    </div>
+    <a class="button outline" href="{% url 'CattleTrace:marketplace-home' %}">Marketplace</a>
+</section>
+
+<section class="profile-grid">
+    <article class="card">
+        <h2>{{ transaction.listing.animal }}</h2>
+        <p class="muted">Listing transaction</p>
+        <div class="detail-list">
+            <p><strong>Buyer:</strong> {{ transaction.buyer }}</p>
+            <p><strong>Seller:</strong> {{ transaction.seller }}</p>
+            <p><strong>Date:</strong> {{ transaction.transaction_date }}</p>
+        </div>
+    </article>
+    <article class="card">
+        <h2>Payment</h2>
+        <div class="stat-card compact">
+            <small>Agreed Price</small>
+            <strong>KES {{ transaction.agreed_price }}</strong>
+        </div>
+        <p><span class="badge info">{{ transaction.get_payment_method_display }}</span></p>
+        <p class="muted">Reference: {{ transaction.payment_ref|default:'-' }}</p>
+    </article>
+</section>
+
+<section class="card">
+    <h2>Notes</h2>
+    <p>{{ transaction.notes|default:'No transaction notes recorded.' }}</p>
+</section>
+{% endblock %}

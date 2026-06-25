@@ -1,0 +1,14 @@
+﻿{% extends 'cattletrace/base.html' %}{% block title %}Slaughter Detail | CattleTrace{% endblock %}{% block content %}
+<section class="page-header">
+   <h1>{{ record.slaughter_no }}</h1>
+   <p>Post-mortem and carcass record</p>
+</section>
+<section class="detail-grid card">
+   <div><small>Animal</small><strong>{{ record.animal }}</strong></div>
+   <div><small>Abattoir</small><strong>{{ record.abattoir }}</strong></div>
+   <div><small>Live Weight</small><strong>{{ record.live_weight_kg }} kg</strong></div>
+   <div><small>Carcass Weight</small><strong>{{ record.carcass_weight_kg }} kg</strong></div>
+   <div><small>Inspection</small><strong>{{ record.get_inspection_result_display }}</strong></div>
+   <div><small>Meat Grade</small><strong>{{ record.meat_grade|default:'-' }}</strong></div>
+</section>
+{% endblock %}
