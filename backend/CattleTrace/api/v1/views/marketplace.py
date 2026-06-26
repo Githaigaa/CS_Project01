@@ -38,7 +38,22 @@ class MarketplaceListingViewSet(SellerQuerysetMixin, viewsets.ModelViewSet):
         queryset = super().get_queryset()
         user = self.request.user
         if user.role == User.Role.BUYER:
-            return queryset.filter(status=MarketplaceListing.ListingStatus.ACTIVE)
+            queryset = queryset.filter(status=MarketplaceListing.ListingStatus.ACTIVE)
+        status = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
+        species = self.request.query_params.get('species')
+        if species:
+            queryset = queryset.filter(animal__breed__name__icontains=species)
+        min_price = self.request.query_params.get('min_price')
+        if min_price:
+            queryset = queryset.filter(asking_price__gte=min_price)
+        max_price = self.request.query_params.get('max_price')
+        if max_price:
+            queryset = queryset.filter(asking_price__lte=max_price)
+        location = self.request.query_params.get('location')
+        if location:
+            queryset = queryset.filter(location_county__icontains=location)
         return queryset
 
 
@@ -51,14 +66,21 @@ class MarketplaceInquiryViewSet(
     queryset = MarketplaceInquiry.objects.select_related('listing', 'buyer').all()
     serializer_class = MarketplaceInquirySerializer
     permission_classes = (IsAuthenticated, IsInquiryParticipant)
-    filter_backends = (OrderingFilter,)
+    filter_backends = (SearchFilter, OrderingFilter)
+    search_fields = ('message', 'listing__animal__tag_number', 'listing__description')
+    ordering_fields = ('sent_at', 'offer_price')
     ordering = ('-sent_at',)
 
     def get_queryset(self):
         user = self.request.user
         if user.role == User.Role.ADMIN:
-            return self.queryset
-        return self.queryset.filter(Q(buyer=user) | Q(listing__seller=user))
+            queryset = self.queryset
+        else:
+            queryset = self.queryset.filter(Q(buyer=user) | Q(listing__seller=user))
+        listing = self.request.query_params.get('listing')
+        if listing:
+            queryset = queryset.filter(listing_id=listing)
+        return queryset
 
 
 class TransactionViewSet(

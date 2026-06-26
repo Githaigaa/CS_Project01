@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { TopNav } from "./components/TopNav";
 import { useAuth } from "./context/AuthContext";
+import { notificationsApi } from "./services/api/notifications";
 import { LandingPage } from "./screens/LandingPage";
 import { LoginPage } from "./screens/LoginPage";
 import { RegisterPage } from "./screens/RegisterPage";
@@ -52,6 +53,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("landing");
   const [selectedAnimalId, setSelectedAnimalId] = useState<string | null>(null);
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -59,6 +61,34 @@ export default function App() {
       setCurrentPage("login");
     }
   }, [status, isAuthenticated, currentPage]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setNotificationCount(0);
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function loadUnreadCount() {
+      try {
+        const stats = await notificationsApi.getUnreadCount();
+        if (isCurrent) {
+          setNotificationCount(stats.count);
+        }
+      } catch {
+        if (isCurrent) {
+          setNotificationCount(0);
+        }
+      }
+    }
+
+    loadUnreadCount();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isAuthenticated, currentPage]);
 
   const handleNavigate = (page: string) => {
     setCurrentPage(page as Page);
@@ -107,7 +137,7 @@ export default function App() {
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar currentPage="animals" onNavigate={handleNavigate} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNav />
+          <TopNav notificationCount={notificationCount} />
           <main className="flex-1 overflow-y-auto">
             <AnimalProfile
               animalId={selectedAnimalId}
@@ -124,7 +154,7 @@ export default function App() {
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar currentPage="animals" onNavigate={handleNavigate} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNav />
+          <TopNav notificationCount={notificationCount} />
           <main className="flex-1 overflow-y-auto">
             <RegisterAnimal
               onBack={() => setCurrentPage("animals")}
@@ -141,7 +171,7 @@ export default function App() {
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar currentPage="marketplace" onNavigate={handleNavigate} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNav />
+          <TopNav notificationCount={notificationCount} />
           <main className="flex-1 overflow-y-auto">
             <MarketplaceDetail
               listingId={selectedListingId}
@@ -158,7 +188,7 @@ export default function App() {
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar currentPage="animals" onNavigate={handleNavigate} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNav />
+          <TopNav notificationCount={notificationCount} />
           <main className="flex-1 overflow-y-auto">
             <TraceabilityTimeline
               animalId={selectedAnimalId}
@@ -174,7 +204,7 @@ export default function App() {
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar currentPage={currentPage} onNavigate={handleNavigate} />
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0 ml-0">
-        <TopNav />
+        <TopNav notificationCount={notificationCount} />
         <main className="flex-1 overflow-y-auto">
           {currentPage === "dashboard" && <Dashboard />}
           {currentPage === "animals" && (

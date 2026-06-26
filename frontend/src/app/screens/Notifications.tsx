@@ -1,99 +1,137 @@
-import { Bell, AlertTriangle, CheckCircle, Info, TrendingUp, Heart, Users, FileText } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Bell, AlertTriangle, CheckCircle, Info, TrendingUp, Heart, Users, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../components/Card";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { formatDateTime } from "../lib/utils";
+import {
+  mapApiNotificationToUi,
+  type NotificationFilter,
+  type UiNotification,
+} from "../lib/api/notifications";
+import { notificationsApi } from "../services/api/notifications";
+import { getApiErrorMessage } from "../services/api/errors";
 
-interface Notification {
-  id: string;
-  type: "alert" | "approval" | "offer" | "transfer" | "info";
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-  actionRequired?: boolean;
-}
-
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "alert",
-    title: "Disease Alert: FMD Outbreak",
-    message: "Foot and Mouth Disease detected at Nakuru Valley Dairy. 3 animals affected. Immediate quarantine required - DVS notified.",
-    timestamp: "2026-06-06T09:30:00",
-    read: false,
-    actionRequired: true,
-  },
-  {
-    id: "2",
-    type: "approval",
-    title: "Movement Approval Required",
-    message: "Movement request KE-MV-2026-001235 from Kisumu Livestock Ranch to Nakuru Valley Dairy awaiting DVS approval.",
-    timestamp: "2026-06-06T08:15:00",
-    read: false,
-    actionRequired: true,
-  },
-  {
-    id: "3",
-    type: "offer",
-    title: "New Offer Received",
-    message: "Nairobi Beef Processors Ltd made an offer of KES 75,000 for RFID 254000234567890.",
-    timestamp: "2026-06-06T07:45:00",
-    read: false,
-    actionRequired: true,
-  },
-  {
-    id: "4",
-    type: "transfer",
-    title: "Ownership Transfer Request",
-    message: "Kamau Mwangi requests transfer of 5 animals to your holding Kiambu Dairy Farm.",
-    timestamp: "2026-06-05T16:20:00",
-    read: true,
-    actionRequired: true,
-  },
-  {
-    id: "5",
-    type: "info",
-    title: "Vaccination Due",
-    message: "15 animals at Kiambu Dairy Farm are due for FMD and ECF booster vaccinations this week.",
-    timestamp: "2026-06-05T14:00:00",
-    read: true,
-    actionRequired: false,
-  },
-  {
-    id: "6",
-    type: "info",
-    title: "Market Listing Expiring Soon",
-    message: "Your listing for RFID 254000234567890 will expire in 3 days.",
-    timestamp: "2026-06-05T10:30:00",
-    read: true,
-    actionRequired: false,
-  },
-  {
-    id: "7",
-    type: "approval",
-    title: "Movement Approved",
-    message: "Your movement request KE-MV-2026-001234 has been approved by DVS Kenya.",
-    timestamp: "2026-06-04T15:45:00",
-    read: true,
-    actionRequired: false,
-  },
-  {
-    id: "8",
-    type: "info",
-    title: "Transaction Completed",
-    message: "Payment received for transaction TXN-1 (KES 80,000). Animal ownership has been transferred.",
-    timestamp: "2026-06-04T11:20:00",
-    read: true,
-    actionRequired: false,
-  },
-];
+const PAGE_SIZE = 10;
 
 export function Notifications() {
-  const unreadCount = mockNotifications.filter(n => !n.read).length;
-  const actionRequiredCount = mockNotifications.filter(n => n.actionRequired && !n.read).length;
+  const [notifications, setNotifications] = useState<UiNotification[]>([]);
+  const [filter, setFilter] = useState<NotificationFilter>("all");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [busyNotificationId, setBusyNotificationId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [actionRequiredCount, setActionRequiredCount] = useState(0);
+  const [diseaseAlertsCount, setDiseaseAlertsCount] = useState(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
-  const getIcon = (type: Notification["type"]) => {
+  const refreshStats = useCallback(async () => {
+    try {
+      const stats = await notificationsApi.getUnreadCount();
+      setUnreadCount(stats.count);
+      setActionRequiredCount(stats.action_required_count);
+      setDiseaseAlertsCount(stats.disease_alerts_count);
+      setPendingApprovalsCount(stats.pending_approvals_count);
+    } catch {
+      // Stats failure should not block the list from rendering.
+    }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await notificationsApi.listNotifications({
+        page,
+        pageSize: PAGE_SIZE,
+        filter,
+      });
+
+      setNotifications(response.results.map(mapApiNotificationToUi));
+      setTotalCount(response.count);
+      setHasNext(Boolean(response.next));
+      setHasPrev(Boolean(response.previous));
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Unable to load notifications. Please try again."));
+      setNotifications([]);
+      setTotalCount(0);
+      setHasNext(false);
+      setHasPrev(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function load() {
+      await fetchNotifications();
+      if (!isCurrent) return;
+      await refreshStats();
+    }
+
+    load();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [fetchNotifications, refreshStats]);
+
+  const handleMarkAllAsRead = async () => {
+    setMarkingAllRead(true);
+    setActionError(null);
+
+    try {
+      await notificationsApi.markAllAsRead();
+      await Promise.all([fetchNotifications(), refreshStats()]);
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, "Unable to mark all notifications as read."));
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    setBusyNotificationId(notificationId);
+    setActionError(null);
+
+    try {
+      await notificationsApi.markAsRead(notificationId);
+      await Promise.all([fetchNotifications(), refreshStats()]);
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, "Unable to mark notification as read."));
+    } finally {
+      setBusyNotificationId(null);
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    setBusyNotificationId(notificationId);
+    setActionError(null);
+
+    try {
+      await notificationsApi.deleteNotification(notificationId);
+      await Promise.all([fetchNotifications(), refreshStats()]);
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, "Unable to delete notification."));
+    } finally {
+      setBusyNotificationId(null);
+    }
+  };
+
+  const getIcon = (type: UiNotification["type"]) => {
     switch (type) {
       case "alert":
         return <AlertTriangle className="w-5 h-5 text-red-600" />;
@@ -110,7 +148,7 @@ export function Notifications() {
     }
   };
 
-  const getBgColor = (type: Notification["type"]) => {
+  const getBgColor = (type: UiNotification["type"]) => {
     switch (type) {
       case "alert":
         return "bg-red-100 dark:bg-red-900/20";
@@ -137,10 +175,21 @@ export function Notifications() {
             {actionRequiredCount > 0 && ` · ${actionRequiredCount} require action`}
           </p>
         </div>
-        <Button variant="outline">
+        <Button
+          variant="outline"
+          disabled={markingAllRead || unreadCount === 0}
+          onClick={handleMarkAllAsRead}
+        >
+          {markingAllRead && <Loader2 className="w-4 h-4 animate-spin" />}
           Mark All as Read
         </Button>
       </div>
+
+      {(error || actionError) && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error || actionError}
+        </div>
+      )}
 
       <div className="grid md:grid-cols-4 gap-6">
         <Card>
@@ -176,7 +225,7 @@ export function Notifications() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-muted-foreground mb-1">Disease Alerts</div>
-                <div className="text-3xl font-semibold">1</div>
+                <div className="text-3xl font-semibold">{diseaseAlertsCount}</div>
               </div>
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
                 <Heart className="w-6 h-6 text-red-600" />
@@ -190,7 +239,7 @@ export function Notifications() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-muted-foreground mb-1">Pending Approvals</div>
-                <div className="text-3xl font-semibold">2</div>
+                <div className="text-3xl font-semibold">{pendingApprovalsCount}</div>
               </div>
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-blue-600" />
@@ -205,72 +254,201 @@ export function Notifications() {
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">All Notifications</h2>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">All</Button>
-              <Button variant="ghost" size="sm">Unread</Button>
-              <Button variant="ghost" size="sm">Action Required</Button>
+              <Button
+                variant={filter === "all" ? "outline" : "ghost"}
+                size="sm"
+                onClick={() => setFilter("all")}
+              >
+                All
+              </Button>
+              <Button
+                variant={filter === "unread" ? "outline" : "ghost"}
+                size="sm"
+                onClick={() => setFilter("unread")}
+              >
+                Unread
+              </Button>
+              <Button
+                variant={filter === "action_required" ? "outline" : "ghost"}
+                size="sm"
+                onClick={() => setFilter("action_required")}
+              >
+                Action Required
+              </Button>
             </div>
           </div>
 
-          {mockNotifications.map((notification) => (
-            <Card
-              key={notification.id}
-              className={`${!notification.read ? 'border-l-4 border-l-primary' : ''}`}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-4">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${getBgColor(notification.type)}`}>
-                    {getIcon(notification.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className={`font-semibold ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
-                            {notification.title}
-                          </h3>
-                          {!notification.read && (
-                            <div className="w-2 h-2 bg-primary rounded-full" />
-                          )}
-                        </div>
-                        <p className="text-muted-foreground">{notification.message}</p>
-                        <div className="text-muted-foreground mt-2">
-                          {formatDateTime(notification.timestamp)}
-                        </div>
-                      </div>
-                      {notification.actionRequired && !notification.read && (
-                        <Badge variant="warning">Action Required</Badge>
-                      )}
-                    </div>
-                    {notification.actionRequired && !notification.read && (
-                      <div className="flex gap-2 mt-3">
-                        {notification.type === "alert" && (
-                          <Button size="sm">View Details</Button>
-                        )}
-                        {notification.type === "approval" && (
-                          <>
-                            <Button size="sm">Approve</Button>
-                            <Button size="sm" variant="outline">Reject</Button>
-                          </>
-                        )}
-                        {notification.type === "offer" && (
-                          <>
-                            <Button size="sm">Accept Offer</Button>
-                            <Button size="sm" variant="outline">Counter Offer</Button>
-                          </>
-                        )}
-                        {notification.type === "transfer" && (
-                          <>
-                            <Button size="sm">Review Request</Button>
-                            <Button size="sm" variant="outline">Decline</Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" aria-label="Loading notifications" />
+            </div>
+          ) : notifications.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No notifications found.
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            notifications.map((notification) => (
+              <Card
+                key={notification.id}
+                className={`${!notification.read ? 'border-l-4 border-l-primary' : ''}`}
+              >
+                <CardContent className="p-4">
+                  <div
+                    className={`flex items-start gap-4 ${!notification.read ? "cursor-pointer" : ""}`}
+                    onClick={() => {
+                      if (!notification.read && busyNotificationId !== notification.id) {
+                        handleMarkAsRead(notification.id);
+                      }
+                    }}
+                  >
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${getBgColor(notification.type)}`}>
+                      {getIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className={`font-semibold ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              {notification.title}
+                            </h3>
+                            {!notification.read && (
+                              <div className="w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <p className="text-muted-foreground">{notification.message}</p>
+                          <div className="text-muted-foreground mt-2">
+                            {formatDateTime(notification.timestamp)}
+                          </div>
+                        </div>
+                        {notification.actionRequired && !notification.read && (
+                          <Badge variant="warning">Action Required</Badge>
+                        )}
+                      </div>
+                      {notification.actionRequired && !notification.read && (
+                        <div className="flex gap-2 mt-3">
+                          {notification.type === "alert" && (
+                            <Button
+                              size="sm"
+                              disabled={busyNotificationId === notification.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleMarkAsRead(notification.id);
+                              }}
+                            >
+                              View Details
+                            </Button>
+                          )}
+                          {notification.type === "approval" && (
+                            <>
+                              <Button
+                                size="sm"
+                                disabled={busyNotificationId === notification.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleMarkAsRead(notification.id);
+                                }}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyNotificationId === notification.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteNotification(notification.id);
+                                }}
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {notification.type === "offer" && (
+                            <>
+                              <Button
+                                size="sm"
+                                disabled={busyNotificationId === notification.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleMarkAsRead(notification.id);
+                                }}
+                              >
+                                Accept Offer
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyNotificationId === notification.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleMarkAsRead(notification.id);
+                                }}
+                              >
+                                Counter Offer
+                              </Button>
+                            </>
+                          )}
+                          {notification.type === "transfer" && (
+                            <>
+                              <Button
+                                size="sm"
+                                disabled={busyNotificationId === notification.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleMarkAsRead(notification.id);
+                                }}
+                              >
+                                Review Request
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyNotificationId === notification.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteNotification(notification.id);
+                                }}
+                              >
+                                Decline
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+
+          {!loading && totalCount > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-sm text-muted-foreground">
+                Page {page} · {totalCount} notification{totalCount !== 1 ? "s" : ""}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || !hasPrev}
+                  onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || !hasNext}
+                  onClick={() => setPage((currentPage) => currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">

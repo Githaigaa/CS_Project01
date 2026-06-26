@@ -9,6 +9,8 @@ from CattleTrace.api.v1.views.marketplace import (
     TransactionViewSet,
 )
 from CattleTrace.api.v1.views.movement import MovementPermitViewSet, MovementRecordViewSet
+from CattleTrace.api.v1.views.notification import NotificationViewSet
+from CattleTrace.api.v1.views.reports import ReportsViewSet
 from CattleTrace.api.v1.views.slaughter import AbattoirViewSet, SlaughterRecordViewSet
 
 router = DefaultRouter()
@@ -20,6 +22,8 @@ router.register('marketplace/transactions', TransactionViewSet, basename='market
 router.register('health-events', HealthRecordViewSet, basename='health-event')
 router.register('movements', MovementRecordViewSet, basename='movement')
 router.register('movement-permits', MovementPermitViewSet, basename='movement-permit')
+router.register('notifications', NotificationViewSet, basename='notification')
+router.register('reports', ReportsViewSet, basename='report')
 router.register('slaughter-records', SlaughterRecordViewSet, basename='slaughter-record')
 router.register('abattoirs', AbattoirViewSet, basename='abattoir')
 

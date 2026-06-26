@@ -7,6 +7,7 @@ from .marketplace import (
     TransactionSerializer,
 )
 from .movement import MovementPermitSerializer, MovementRecordSerializer
+from .notification import NotificationSerializer
 from .slaughter import AbattoirSerializer, SlaughterRecordSerializer
 from .user import (
     ChangePasswordSerializer,
@@ -27,6 +28,7 @@ __all__ = [
     'MarketplaceListingSerializer',
     'MovementPermitSerializer',
     'MovementRecordSerializer',
+    'NotificationSerializer',
     'SlaughterRecordSerializer',
     'TransactionSerializer',
     'UserProfileUpdateSerializer',

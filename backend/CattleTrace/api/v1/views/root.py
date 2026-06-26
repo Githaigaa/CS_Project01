@@ -34,6 +34,8 @@ class APIRootView(APIView):
                     'movement_permits': '/api/v1/movement-permits/',
                     'slaughter_records': '/api/v1/slaughter-records/',
                     'abattoirs': '/api/v1/abattoirs/',
+                    'notifications': '/api/v1/notifications/',
+                    'reports': '/api/v1/reports/',
                 },
             }
         )
