@@ -1,4 +1,5 @@
 import { ArrowRight, Shield, TrendingUp, Heart, FileCheck, Users, Map } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 
@@ -7,6 +8,12 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
+  const { isAuthenticated } = useAuth();
+
+  const enterPlatform = () => {
+    onNavigate(isAuthenticated ? "dashboard" : "login");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -17,9 +24,14 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             </div>
             <span className="font-semibold">CattleTrace</span>
           </div>
-          <Button onClick={() => onNavigate("dashboard")}>
-            Enter Platform
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => onNavigate("login")}>
+              Sign In
+            </Button>
+            <Button onClick={enterPlatform}>
+              Enter Platform
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -36,14 +48,14 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <div className="flex flex-wrap gap-4">
                 <Button
                   size="lg"
-                  onClick={() => onNavigate("animals")}
+                  onClick={enterPlatform}
                 >
                   Register Animal <ArrowRight className="w-5 h-5" />
                 </Button>
                 <Button
                   variant="outline"
                   size="lg"
-                  onClick={() => onNavigate("marketplace")}
+                  onClick={enterPlatform}
                 >
                   Explore Marketplace
                 </Button>
@@ -164,7 +176,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <Button
             variant="accent"
             size="lg"
-            onClick={() => onNavigate("dashboard")}
+            onClick={() => onNavigate(isAuthenticated ? "dashboard" : "register")}
           >
             Get Started Now <ArrowRight className="w-5 h-5" />
           </Button>

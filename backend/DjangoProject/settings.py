@@ -148,6 +148,8 @@ REST_FRAMEWORK = {
     'DEFAULT_VERSION': 'v1',
     'ALLOWED_VERSIONS': ['v1'],
     'VERSION_PARAM': 'version',
+    'DEFAULT_PAGINATION_CLASS': 'CattleTrace.api.pagination.StandardResultsSetPagination',
+    'PAGE_SIZE': 10,
 }
 
 # Simple JWT
@@ -158,7 +160,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': False,
     'UPDATE_LAST_LOGIN': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'TOKEN_OBTAIN_SERIALIZER': 'CattleTrace.api.v1.serializers.user.CustomTokenObtainPairSerializer',
+    'TOKEN_OBTAIN_SERIALIZER': 'CattleTrace.api.auth.serializers.CustomTokenObtainPairSerializer',
 }
 
 # CORS (React / Vite dev server)

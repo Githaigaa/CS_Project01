@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { TopNav } from "./components/TopNav";
+import { useAuth } from "./context/AuthContext";
 import { LandingPage } from "./screens/LandingPage";
+import { LoginPage } from "./screens/LoginPage";
+import { RegisterPage } from "./screens/RegisterPage";
 import { Dashboard } from "./screens/Dashboard";
 import { AnimalRegistry } from "./screens/AnimalRegistry";
 import { AnimalProfile } from "./screens/AnimalProfile";
@@ -21,6 +25,8 @@ import { WireframeGallery } from "./screens/WireframeGallery";
 
 type Page =
   | "landing"
+  | "login"
+  | "register"
   | "dashboard"
   | "animals"
   | "animal-profile"
@@ -39,10 +45,20 @@ type Page =
   | "profile"
   | "wireframes";
 
+const PUBLIC_PAGES: Page[] = ["landing", "login", "register"];
+
 export default function App() {
+  const { status, isAuthenticated } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>("landing");
   const [selectedAnimalId, setSelectedAnimalId] = useState<string | null>(null);
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!isAuthenticated && !PUBLIC_PAGES.includes(currentPage)) {
+      setCurrentPage("login");
+    }
+  }, [status, isAuthenticated, currentPage]);
 
   const handleNavigate = (page: string) => {
     setCurrentPage(page as Page);
@@ -66,8 +82,24 @@ export default function App() {
     setCurrentPage("animals");
   };
 
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" aria-label="Loading session" />
+      </div>
+    );
+  }
+
   if (currentPage === "landing") {
     return <LandingPage onNavigate={handleNavigate} />;
+  }
+
+  if (currentPage === "login") {
+    return <LoginPage onNavigate={handleNavigate} />;
+  }
+
+  if (currentPage === "register") {
+    return <RegisterPage onNavigate={handleNavigate} />;
   }
 
   if (currentPage === "animal-profile" && selectedAnimalId) {
