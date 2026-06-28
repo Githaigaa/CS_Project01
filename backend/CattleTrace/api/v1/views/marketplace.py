@@ -89,7 +89,12 @@ class TransactionViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = Transaction.objects.select_related('listing', 'buyer', 'seller').all()
+    queryset = Transaction.objects.select_related(
+        'listing',
+        'listing__animal',
+        'buyer',
+        'seller',
+    ).all()
     serializer_class = TransactionSerializer
     permission_classes = (IsAuthenticated, IsTransactionParticipant)
     filter_backends = (OrderingFilter,)

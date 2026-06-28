@@ -36,6 +36,9 @@ class APIRootView(APIView):
                     'abattoirs': '/api/v1/abattoirs/',
                     'notifications': '/api/v1/notifications/',
                     'reports': '/api/v1/reports/',
+                    'me': '/api/v1/auth/me/',
+                    'me_preferences': '/api/v1/auth/me/preferences/',
+                    'me_avatar': '/api/v1/auth/me/avatar/',
                 },
             }
         )

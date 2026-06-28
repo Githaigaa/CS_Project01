@@ -410,14 +410,14 @@ export function HealthRecords() {
                 <Button variant="outline" size="sm" onClick={() => setSelectedRecord(null)}>
                   Close
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleEditRecord(selectedRecord.id)}>
+                <Button variant="outline" size="sm" onClick={() => handleEditRecord(selectedRecord!.id)}>
                   Edit
                 </Button>
                 <Button
                   variant="danger"
                   size="sm"
-                  disabled={deletingRecordId === selectedRecord.id}
-                  onClick={() => handleDeleteRecord(selectedRecord.id)}
+                  disabled={deletingRecordId === selectedRecord!.id}
+                  onClick={() => handleDeleteRecord(selectedRecord!.id)}
                 >
                   Delete
                 </Button>

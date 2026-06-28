@@ -17,9 +17,23 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 import uuid
 
-# ─────────────────────────────────────────────
-# 1. USER & FARM
-# ─────────────────────────────────────────────
+
+def default_notification_preferences():
+    return {
+        'email': {
+            'disease_alerts': True,
+            'movement_approvals': True,
+            'marketplace_offers': True,
+            'transfer_requests': True,
+            'payment_confirmations': True,
+            'system_updates': True,
+        },
+        'sms': {
+            'critical_health_alerts': False,
+            'movement_approvals': False,
+            'high_value_offers': False,
+        },
+    }
 
 
 class User(AbstractUser):
@@ -37,7 +51,9 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=20, blank=True)
     national_id = models.CharField(max_length=50, unique=True, blank=True, null=True)
     profile_photo = models.ImageField(upload_to="users/photos/", blank=True, null=True)
+    bio = models.TextField(blank=True)
     location = models.CharField(max_length=255, blank=True)
+    notification_preferences = models.JSONField(default=default_notification_preferences, blank=True)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -22,7 +22,6 @@ import { Abattoirs } from "./screens/Abattoirs";
 import { Notifications } from "./screens/Notifications";
 import { Settings } from "./screens/Settings";
 import { TraceabilityTimeline } from "./screens/TraceabilityTimeline";
-import { WireframeGallery } from "./screens/WireframeGallery";
 
 type Page =
   | "landing"
@@ -43,8 +42,7 @@ type Page =
   | "reports"
   | "notifications"
   | "settings"
-  | "profile"
-  | "wireframes";
+  | "profile";
 
 const PUBLIC_PAGES: Page[] = ["landing", "login", "register"];
 
@@ -225,7 +223,6 @@ export default function App() {
           {currentPage === "notifications" && <Notifications />}
           {currentPage === "settings" && <Settings />}
           {currentPage === "profile" && <Settings />}
-          {currentPage === "wireframes" && <WireframeGallery />}
         </main>
       </div>
     </div>

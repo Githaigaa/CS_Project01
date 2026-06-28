@@ -1,9 +1,19 @@
-import { ArrowLeft, Shield, Heart, TrendingUp, Store, Receipt, Building2, CheckCircle, Download, QrCode } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Shield, CheckCircle, Download, QrCode, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../components/Card";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
-import { mockAnimals, mockHealthEvents, mockMovements, mockTransactions, mockSlaughterRecords } from "../lib/mockData";
+import {
+  buildTraceabilityTimeline,
+  filterSlaughterForAnimal,
+  type TimelineEvent,
+} from "../lib/api/traceability";
+import type { Animal } from "../lib/types";
 import { formatDate, formatDateTime } from "../lib/utils";
+import { animalsApi } from "../services/api/animals";
+import { animalProfileApi } from "../services/api/animalProfile";
+import { getApiErrorMessage } from "../services/api/errors";
+import { slaughterApi } from "../services/api/slaughter";
 
 interface TraceabilityTimelineProps {
   animalId: string;
@@ -11,159 +21,76 @@ interface TraceabilityTimelineProps {
 }
 
 export function TraceabilityTimeline({ animalId, onBack }: TraceabilityTimelineProps) {
-  const animal = mockAnimals[0];
+  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const timelineEvents = [
-    {
-      id: "1",
-      type: "registration",
-      icon: Shield,
-      iconColor: "text-primary",
-      bgColor: "bg-primary",
-      title: "Animal Registration",
-      timestamp: animal.registrationDate,
-      description: `Registered by ${animal.currentOwner}`,
-      details: {
-        RFID: animal.rfid,
-        Species: animal.species,
-        Breed: animal.breed,
-        Sex: animal.sex,
-      },
-      status: "completed",
-    },
-    {
-      id: "2",
-      type: "health",
-      icon: Heart,
-      iconColor: "text-green-600",
-      bgColor: "bg-green-600",
-      title: "Vaccination - FMD Vaccine",
-      timestamp: "2026-05-15T10:30:00",
-      description: "Administered by Dr. Njoroge Macharia",
-      details: {
-        "Event Type": "Vaccination",
-        Vaccine: "Foot and Mouth Disease",
-        "Credential Level": "Licensed Veterinary Officer",
-      },
-      status: "completed",
-    },
-    {
-      id: "3",
-      type: "health",
-      icon: Heart,
-      iconColor: "text-green-600",
-      bgColor: "bg-green-600",
-      title: "Health Check - Routine",
-      timestamp: "2026-05-20T14:00:00",
-      description: "Annual health inspection completed",
-      details: {
-        "Event Type": "Inspection",
-        Result: "Passed",
-        Inspector: "Dr. Kipchoge Tanui",
-      },
-      status: "completed",
-    },
-    {
-      id: "4",
-      type: "marketplace",
-      icon: Store,
-      iconColor: "text-accent",
-      bgColor: "bg-accent",
-      title: "Listed on Marketplace",
-      timestamp: "2026-05-25T09:00:00",
-      description: "Listed for sale by Kamau Mwangi",
-      details: {
-        "Asking Price": "KES 85,000",
-        Views: "127",
-        Offers: "3",
-      },
-      status: "completed",
-    },
-    {
-      id: "5",
-      type: "movement",
-      icon: TrendingUp,
-      iconColor: "text-blue-600",
-      bgColor: "bg-blue-600",
-      title: "Movement - Sale",
-      timestamp: "2026-05-28T11:30:00",
-      description: "Kiambu Dairy Farm → Dagoretti Livestock Market",
-      details: {
-        Origin: "Kiambu Dairy Farm",
-        Destination: "Dagoretti Livestock Market",
-        "Permit Number": "KE-MV-2026-001234",
-        Purpose: "Sale",
-      },
-      status: "completed",
-    },
-    {
-      id: "6",
-      type: "transaction",
-      icon: Receipt,
-      iconColor: "text-secondary",
-      bgColor: "bg-secondary",
-      title: "Transaction Completed",
-      timestamp: "2026-05-28T15:00:00",
-      description: "Sold to Nairobi Beef Processors Ltd",
-      details: {
-        Seller: "Kamau Mwangi",
-        Buyer: "Nairobi Beef Processors Ltd",
-        "Agreed Price": "KES 80,000",
-        "Payment Status": "Paid",
-      },
-      status: "completed",
-    },
-    {
-      id: "7",
-      type: "movement",
-      icon: TrendingUp,
-      iconColor: "text-blue-600",
-      bgColor: "bg-blue-600",
-      title: "Movement - Slaughter",
-      timestamp: "2026-06-01T08:00:00",
-      description: "Dagoretti Livestock Market → Nairobi Modern Abattoir",
-      details: {
-        Origin: "Dagoretti Livestock Market",
-        Destination: "Nairobi Modern Abattoir",
-        Purpose: "Slaughter",
-      },
-      status: "completed",
-    },
-    {
-      id: "8",
-      type: "slaughter",
-      icon: Building2,
-      iconColor: "text-purple-600",
-      bgColor: "bg-purple-600",
-      title: "Slaughter Processing",
-      timestamp: "2026-06-01T10:30:00",
-      description: "Processed at Nairobi Modern Abattoir",
-      details: {
-        Abattoir: "Nairobi Modern Abattoir",
-        "Chain Number": "NMA-2026-05432",
-        "Carcass ID": "CARC-20260601-001",
-        Grade: "A",
-        Feedback: "Good meat quality",
-      },
-      status: "completed",
-    },
-    {
-      id: "9",
-      type: "final",
-      icon: CheckCircle,
-      iconColor: "text-green-600",
-      bgColor: "bg-green-600",
-      title: "Lifecycle Complete",
-      timestamp: "2026-06-01T12:00:00",
-      description: "Full traceability chain verified",
-      details: {
-        "Total Lifecycle": "88 days",
-        "Traceability Score": "98%",
-        "Compliance Status": "Verified",
-      },
-      status: "completed",
-    },
-  ];
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadTimeline() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const apiAnimal = await animalsApi.getAnimal(animalId);
+        const related = await animalProfileApi.getAnimalProfileData(apiAnimal.tag_number);
+        const slaughterResponse = await slaughterApi.listSlaughterRecords({ pageSize: 100 });
+        const slaughterRecords = filterSlaughterForAnimal(
+          slaughterResponse.results,
+          apiAnimal.id,
+        );
+        const transactions = related.transactions.filter(
+          (transaction) => transaction.animal_tag === apiAnimal.tag_number,
+        );
+
+        if (!isCurrent) return;
+
+        const timeline = buildTraceabilityTimeline({
+          apiAnimal,
+          healthRecords: related.healthRecords,
+          movementRecords: related.movementRecords,
+          transactions,
+          slaughterRecords,
+        });
+
+        setAnimal(timeline.animal);
+        setTimelineEvents(timeline.events);
+      } catch (err) {
+        if (!isCurrent) return;
+        setError(getApiErrorMessage(err, "Unable to load traceability timeline. Please try again."));
+        setAnimal(null);
+        setTimelineEvents([]);
+      } finally {
+        if (isCurrent) setLoading(false);
+      }
+    }
+
+    loadTimeline();
+    return () => { isCurrent = false; };
+  }, [animalId]);
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" aria-label="Loading traceability timeline" />
+      </div>
+    );
+  }
+
+  if (error || !animal) {
+    return (
+      <div className="p-6 space-y-4">
+        <Button variant="ghost" onClick={onBack}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error || "Animal not found."}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -189,11 +116,17 @@ export function TraceabilityTimeline({ animalId, onBack }: TraceabilityTimelineP
         <Card className="lg:col-span-1">
           <CardContent className="p-6">
             <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-4">
-              <img
-                src={animal.photo}
-                alt={animal.breed}
-                className="w-full h-full object-cover"
-              />
+              {animal.photo ? (
+                <img
+                  src={animal.photo}
+                  alt={animal.breed}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  No photo
+                </div>
+              )}
             </div>
             <div className="space-y-3">
               <div>
@@ -214,10 +147,10 @@ export function TraceabilityTimeline({ animalId, onBack }: TraceabilityTimelineP
                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-primary"
-                      style={{ width: `${animal.traceabilityScore}%` }}
+                      style={{ width: `${animal.traceabilityScore ?? 0}%` }}
                     />
                   </div>
-                  <span className="font-semibold">{animal.traceabilityScore}%</span>
+                  <span className="font-semibold">{animal.traceabilityScore ?? 0}%</span>
                 </div>
               </div>
               <div className="pt-4 border-t border-border">
@@ -241,68 +174,74 @@ export function TraceabilityTimeline({ animalId, onBack }: TraceabilityTimelineP
                 </p>
               </div>
 
-              <div className="relative">
-                <div className="absolute left-8 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-secondary to-green-600" />
-
-                <div className="space-y-8">
-                  {timelineEvents.map((event, idx) => {
-                    const Icon = event.icon;
-                    return (
-                      <div key={event.id} className="relative pl-20">
-                        <div
-                          className={`absolute left-0 w-16 h-16 rounded-2xl ${event.bgColor} text-white flex items-center justify-center shadow-lg z-10`}
-                        >
-                          <Icon className="w-8 h-8" />
-                        </div>
-
-                        <Card hover className="border-2 border-border">
-                          <CardContent className="p-6">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-lg mb-1">{event.title}</h3>
-                                <p className="text-muted-foreground">{event.description}</p>
-                              </div>
-                              <Badge variant="success">
-                                <CheckCircle className="w-3 h-3" />
-                                Verified
-                              </Badge>
-                            </div>
-
-                            <div className="text-muted-foreground mb-4">
-                              {formatDateTime(event.timestamp)}
-                            </div>
-
-                            <div className="grid md:grid-cols-2 gap-4 bg-muted/50 rounded-lg p-4">
-                              {Object.entries(event.details).map(([key, value]) => (
-                                <div key={key}>
-                                  <div className="text-muted-foreground">{key}</div>
-                                  <div className="font-medium">{value}</div>
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="flex gap-2 mt-4">
-                              <Button variant="ghost" size="sm">
-                                View Documentation
-                              </Button>
-                              {event.type === "health" && (
-                                <Button variant="ghost" size="sm">
-                                  View Certificate
-                                </Button>
-                              )}
-                              {event.type === "transaction" && (
-                                <Button variant="ghost" size="sm">
-                                  View Receipt
-                                </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    );
-                  })}
+              {timelineEvents.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  No traceability events recorded for this animal yet.
                 </div>
-              </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute left-8 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-secondary to-green-600" />
+
+                  <div className="space-y-8">
+                    {timelineEvents.map((event) => {
+                      const Icon = event.icon;
+                      return (
+                        <div key={event.id} className="relative pl-20">
+                          <div
+                            className={`absolute left-0 w-16 h-16 rounded-2xl ${event.bgColor} text-white flex items-center justify-center shadow-lg z-10`}
+                          >
+                            <Icon className="w-8 h-8" />
+                          </div>
+
+                          <Card hover className="border-2 border-border">
+                            <CardContent className="p-6">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-lg mb-1">{event.title}</h3>
+                                  <p className="text-muted-foreground">{event.description}</p>
+                                </div>
+                                <Badge variant="success">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Verified
+                                </Badge>
+                              </div>
+
+                              <div className="text-muted-foreground mb-4">
+                                {formatDateTime(event.timestamp)}
+                              </div>
+
+                              <div className="grid md:grid-cols-2 gap-4 bg-muted/50 rounded-lg p-4">
+                                {Object.entries(event.details).map(([key, value]) => (
+                                  <div key={key}>
+                                    <div className="text-muted-foreground">{key}</div>
+                                    <div className="font-medium">{value}</div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="flex gap-2 mt-4">
+                                <Button variant="ghost" size="sm">
+                                  View Documentation
+                                </Button>
+                                {event.type === "health" && (
+                                  <Button variant="ghost" size="sm">
+                                    View Certificate
+                                  </Button>
+                                )}
+                                {event.type === "transaction" && (
+                                  <Button variant="ghost" size="sm">
+                                    View Receipt
+                                  </Button>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-8 p-6 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl border-2 border-primary/20">
                 <div className="flex items-center gap-4">
@@ -320,7 +259,7 @@ export function TraceabilityTimeline({ animalId, onBack }: TraceabilityTimelineP
                   </div>
                   <div className="text-right">
                     <div className="text-3xl font-semibold text-primary mb-1">
-                      {animal.traceabilityScore}%
+                      {animal.traceabilityScore ?? 0}%
                     </div>
                     <div className="text-muted-foreground">Compliance</div>
                   </div>

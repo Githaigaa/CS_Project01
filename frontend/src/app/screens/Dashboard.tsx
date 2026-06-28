@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
 import { Badge } from "../components/Badge";
 import { StatCardSkeleton, ActivityRowSkeleton } from "../components/Skeleton";
@@ -32,6 +32,8 @@ import { mapApiMovementRecord, mapApiHealthRecord } from "../lib/api/animalProfi
 import type { DashboardData } from "../lib/api/dashboard";
 import { EMPTY_DASHBOARD } from "../lib/api/dashboard";
 import type { Movement, HealthEvent } from "../lib/types";
+import { animalsApi } from "../services/api/animals";
+import { mapApiAnimalToAnimal } from "../lib/api/animals";
 
 // ─────────────────────────────────────────────
 // Static / illustrative chart data
@@ -39,31 +41,11 @@ import type { Movement, HealthEvent } from "../lib/types";
 // endpoint yet. They remain static and are clearly marked as illustrative.
 // ─────────────────────────────────────────────
 
-/* illustrative */ const speciesData = [
-  { name: "Cattle", value: 820, color: "#2E7D32" },
-  { name: "Goats", value: 280, color: "#FF9800" },
-  { name: "Sheep", value: 120, color: "#1565C0" },
-  { name: "Camels", value: 18, color: "#F59E0B" },
-  { name: "Donkeys", value: 9, color: "#64748B" },
-];
+const CHART_COLORS = ["#2E7D32", "#FF9800", "#1565C0", "#F59E0B", "#64748B"];
 
-/* illustrative */ const movementData = [
-  { month: "Jan", movements: 45 },
-  { month: "Feb", movements: 52 },
-  { month: "Mar", movements: 48 },
-  { month: "Apr", movements: 61 },
-  { month: "May", movements: 58 },
-  { month: "Jun", movements: 67 },
-];
-
-/* illustrative */ const populationData = [
-  { month: "Jan", count: 1180 },
-  { month: "Feb", count: 1205 },
-  { month: "Mar", count: 1198 },
-  { month: "Apr", count: 1220 },
-  { month: "May", count: 1235 },
-  { month: "Jun", count: 1247 },
-];
+function getMonthLabel(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleString("en", { month: "short" });
+}
 
 // ─────────────────────────────────────────────
 // Component
@@ -76,18 +58,42 @@ export function Dashboard() {
   // Derived UI lists — mapped from raw API shapes to UI types
   const [movements, setMovements] = useState<Movement[]>([]);
   const [healthEvents, setHealthEvents] = useState<HealthEvent[]>([]);
+  const [animalBreedData, setAnimalBreedData] = useState<{ name: string; value: number; color: string }[]>([]);
 
   useEffect(() => {
     let isCurrent = true;
 
     async function load() {
       setLoading(true);
-      const result = await dashboardApi.getDashboardData();
+      const [result, animalResult] = await Promise.allSettled([
+        dashboardApi.getDashboardData(),
+        animalsApi.listAnimals({ pageSize: 100, ordering: "-registration_date" }),
+      ]);
       if (!isCurrent) return;
 
-      setData(result);
-      setMovements(result.recentMovements.map(mapApiMovementRecord));
-      setHealthEvents(result.recentHealthEvents.map(mapApiHealthRecord));
+      if (result.status === "fulfilled") {
+        setData(result.value);
+        setMovements(result.value.recentMovements.map(mapApiMovementRecord));
+        setHealthEvents(result.value.recentHealthEvents.map(mapApiHealthRecord));
+      }
+
+      if (animalResult.status === "fulfilled") {
+        const breedCounts = animalResult.value.results
+          .map(mapApiAnimalToAnimal)
+          .reduce<Record<string, number>>((counts, animal) => {
+            counts[animal.breed] = (counts[animal.breed] || 0) + 1;
+            return counts;
+          }, {});
+        setAnimalBreedData(
+          Object.entries(breedCounts).map(([name, value], index) => ({
+            name,
+            value,
+            color: CHART_COLORS[index % CHART_COLORS.length],
+          })),
+        );
+      } else {
+        setAnimalBreedData([]);
+      }
       setLoading(false);
     }
 
@@ -96,6 +102,18 @@ export function Dashboard() {
   }, []);
 
   const { stats, errors } = data;
+  const populationData = useMemo(
+    () => [{ month: "Current", count: stats.totalAnimals }],
+    [stats.totalAnimals],
+  );
+  const movementData = useMemo(() => {
+    const counts = movements.reduce<Record<string, number>>((acc, movement) => {
+      const month = getMonthLabel(movement.movementDate);
+      acc[month] = (acc[month] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([month, count]) => ({ month, movements: count }));
+  }, [movements]);
 
   return (
     <div className="p-6 space-y-6">
@@ -294,13 +312,13 @@ export function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Species Distribution</CardTitle>
+            <CardTitle>Breed Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={speciesData}
+                  data={animalBreedData}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -309,7 +327,7 @@ export function Dashboard() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {speciesData.map((entry, index) => (
+                  {animalBreedData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>

@@ -97,9 +97,11 @@ export function WireframeGallery() {
             <Card
               key={wireframe.id}
               className="border-2 border-dashed border-primary hover:border-primary hover:shadow-lg transition-all cursor-pointer"
-              onClick={() => setSelectedWireframe(wireframe.id)}
             >
-              <div className="p-6 space-y-4">
+              <div
+                className="p-6 space-y-4"
+                onClick={() => setSelectedWireframe(wireframe.id)}
+              >
                 <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center">
                   <Icon className="w-8 h-8 text-primary" />
                 </div>

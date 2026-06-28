@@ -79,6 +79,15 @@ class MarketplaceInquirySerializer(serializers.ModelSerializer):
 class TransactionSerializer(serializers.ModelSerializer):
     buyer = serializers.PrimaryKeyRelatedField(read_only=True)
     seller = serializers.PrimaryKeyRelatedField(read_only=True)
+    animal_tag = serializers.CharField(source='listing.animal.tag_number', read_only=True)
+    asking_price = serializers.DecimalField(
+        source='listing.asking_price',
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+    seller_name = serializers.CharField(source='seller.username', read_only=True)
+    buyer_name = serializers.CharField(source='buyer.username', read_only=True)
     listing = serializers.PrimaryKeyRelatedField(
         queryset=MarketplaceListing.objects.filter(status=MarketplaceListing.ListingStatus.ACTIVE),
     )
@@ -88,8 +97,12 @@ class TransactionSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'listing',
+            'animal_tag',
+            'asking_price',
             'buyer',
+            'buyer_name',
             'seller',
+            'seller_name',
             'agreed_price',
             'payment_method',
             'payment_ref',

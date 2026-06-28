@@ -4,9 +4,11 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from CattleTrace.api.auth.views import (
+    AvatarUploadView,
     ChangePasswordView,
     CustomTokenObtainPairView,
     MeView,
+    PreferencesView,
     RegisterView,
 )
 
@@ -15,5 +17,7 @@ urlpatterns = [
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("me/", MeView.as_view(), name="me"),
+    path("me/avatar/", AvatarUploadView.as_view(), name="me_avatar"),
+    path("me/preferences/", PreferencesView.as_view(), name="me_preferences"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
 ]

@@ -19,8 +19,31 @@ export interface ApiUser {
   phone_number: string;
   national_id: string | null;
   location: string;
+  bio?: string;
+  profile_photo?: string | null;
+  notification_preferences?: NotificationPreferences;
   is_verified: boolean;
   date_joined: string;
+}
+
+export interface NotificationPreferences {
+  email: Record<string, boolean>;
+  sms: Record<string, boolean>;
+}
+
+export interface ProfileUpdatePayload {
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  national_id?: string | null;
+  location?: string;
+  bio?: string;
+}
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
 }
 
 export interface TokenPairResponse {

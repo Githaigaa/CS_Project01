@@ -6,6 +6,7 @@
 
 import type { HealthEvent, Movement, Transaction } from "../types";
 import type { PaginatedResponse } from "./animals";
+import { mapApiTransactionToTransaction } from "./transactions";
 
 // ─────────────────────────────────────────────
 // Raw API response types (mirror DRF serializers)
@@ -71,6 +72,10 @@ export interface ApiTransaction {
   listing: number;
   buyer: number;
   seller: number;
+  animal_tag?: string;
+  asking_price?: string;
+  buyer_name?: string;
+  seller_name?: string;
   agreed_price: string;
   payment_method: string;
   payment_ref: string;
@@ -168,16 +173,5 @@ export function mapApiMovementRecord(r: ApiMovementRecord): Movement {
 // ─────────────────────────────────────────────
 
 export function mapApiTransaction(r: ApiTransaction): Transaction {
-  return {
-    id: String(r.id),
-    animalId: String(r.listing),
-    animalRfid: "",
-    seller: `Owner #${r.seller}`,
-    buyer: `Buyer #${r.buyer}`,
-    askingPrice: parseFloat(r.agreed_price),
-    agreedPrice: parseFloat(r.agreed_price),
-    paymentStatus: "Paid",
-    saleDate: r.transaction_date.split("T")[0],
-    status: "Completed",
-  };
+  return mapApiTransactionToTransaction(r);
 }
