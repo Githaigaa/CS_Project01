@@ -1,13 +1,15 @@
 """Movement record and permit API viewsets."""
 
-from rest_framework import viewsets
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from CattleTrace.api.permissions import IsMovementAuthorized
 from CattleTrace.api.v1.mixins import AnimalRelatedQuerysetMixin, RoleScopedQuerysetMixin
 from CattleTrace.api.v1.serializers import MovementPermitSerializer, MovementRecordSerializer
-from CattleTrace.models import MovementPermit, MovementRecord, User
+from CattleTrace.models import MovementPermit, MovementRecord, Notification, User
 
 
 class MovementPermitViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -22,15 +24,85 @@ class MovementPermitViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in (User.Role.INSPECTOR, User.Role.ADMIN):
+        if user.role in (User.Role.INSPECTOR, User.Role.DVS, User.Role.ADMIN):
             queryset = self.queryset
         else:
             queryset = self.queryset.filter(status=MovementPermit.Status.APPROVED)
 
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
+        permit_status = self.request.query_params.get('status')
+        if permit_status:
+            queryset = queryset.filter(status=permit_status)
         return queryset
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        """DVS officer approves a movement permit."""
+        permit = self.get_object()
+        user = request.user
+
+        if user.role not in (User.Role.DVS, User.Role.INSPECTOR, User.Role.ADMIN):
+            return Response(
+                {'detail': 'Only DVS officers or inspectors may approve permits.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if permit.status != MovementPermit.Status.PENDING:
+            return Response(
+                {'detail': f'Permit is already {permit.get_status_display()}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        permit.status = MovementPermit.Status.APPROVED
+        permit.issued_by = user
+        permit.save(update_fields=['status', 'issued_by'])
+
+        # Notify movements associated with this permit
+        for movement in permit.movementrecord_set.select_related('recorded_by').all():
+            if movement.recorded_by:
+                Notification.objects.create(
+                    recipient=movement.recorded_by,
+                    notification_type=Notification.NotificationType.MOVEMENT_APPROVED,
+                    title=f"Movement permit {permit.permit_number} approved",
+                    message=f"Your movement permit {permit.permit_number} has been approved by {user.get_full_name() or user.username}.",
+                    related_animal=movement.animal,
+                )
+
+        return Response({'detail': 'Permit approved.', 'status': permit.status})
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        """DVS officer rejects a movement permit."""
+        permit = self.get_object()
+        user = request.user
+
+        if user.role not in (User.Role.DVS, User.Role.INSPECTOR, User.Role.ADMIN):
+            return Response(
+                {'detail': 'Only DVS officers or inspectors may reject permits.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if permit.status != MovementPermit.Status.PENDING:
+            return Response(
+                {'detail': f'Permit is already {permit.get_status_display()}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reason = request.data.get('reason', '')
+        permit.status = MovementPermit.Status.REJECTED
+        permit.issued_by = user
+        if reason:
+            permit.notes = f"Rejected: {reason}"
+        permit.save(update_fields=['status', 'issued_by', 'notes'])
+
+        for movement in permit.movementrecord_set.select_related('recorded_by').all():
+            if movement.recorded_by:
+                Notification.objects.create(
+                    recipient=movement.recorded_by,
+                    notification_type=Notification.NotificationType.MOVEMENT_REJECTED,
+                    title=f"Movement permit {permit.permit_number} rejected",
+                    message=f"Your movement permit {permit.permit_number} was rejected. {reason}",
+                    related_animal=movement.animal,
+                )
+
+        return Response({'detail': 'Permit rejected.', 'status': permit.status})
 
 
 class MovementRecordViewSet(AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):

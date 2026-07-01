@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CattleTrace — Sign In / Create Account</title>
+  <meta name="description" content="Sign in or create your CattleTrace livestock traceability account." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════════════════════
+       DESIGN TOKENS  — matches theme.css exactly
+    ═══════════════════════════════════════════════ */
+    :root {
+      --primary:            #2E7D32;
+      --primary-h:          #256429;      /* hover */
+      --primary-fg:         #ffffff;
+      --secondary:          #1565C0;
+      --accent:             #FF9800;
+      --background:         #F8FAFC;
+      --foreground:         #1E293B;
+      --card:               #ffffff;
+      --muted:              #F1F5F9;
+      --muted-fg:           #64748B;
+      --border:             #E2E8F0;
+      --input-bg:           #ffffff;
+      --ring:               #2E7D32;
+      --destructive:        #DC2626;
+      --destructive-light:  #FEF2F2;
+      --destructive-border: #FECACA;
+      --destructive-dark:   #991B1B;
+      --success:            #16A34A;
+      --radius:             0.75rem;
+      --radius-xl:          1rem;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.10);
+    }
+
+    /* ═══════════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1 { font-size: 1.5rem;  font-weight: 600; line-height: 1.3; }
+    h2 { font-size: 1.25rem; font-weight: 600; }
+    label { font-size: 1rem; font-weight: 500; display: block; margin-bottom: .375rem; }
+    button { font-family: inherit; font-size: 1rem; font-weight: 500; cursor: pointer; }
+    input, select { font-family: inherit; font-size: 1rem; font-weight: 400; }
+
+    /* ═══════════════════════════════════════════════
+       PAGE ROUTING  (show/hide via JS class)
+    ═══════════════════════════════════════════════ */
+    .page         { display: none; min-height: 100vh; }
+    .page.active  { display: block; }
+
+    /* ═══════════════════════════════════════════════
+       SITE HEADER
+    ═══════════════════════════════════════════════ */
+    .site-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-inner {
+      max-width: 80rem;
+      margin: 0 auto;
+      padding: .875rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Brand logo */
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .625rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--foreground);
+      text-decoration: none;
+    }
+    .brand:hover { text-decoration: none; }
+    .brand-icon {
+      width: 2.5rem; height: 2.5rem;
+      background: var(--primary);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .brand-icon svg { width: 1.375rem; height: 1.375rem; color: #fff; display: block; }
+    .brand-name { font-size: 1.0625rem; font-weight: 600; }
+
+    /* ═══════════════════════════════════════════════
+       AUTH LAYOUT
+    ═══════════════════════════════════════════════ */
+    .auth-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1rem 4rem;
+      min-height: calc(100vh - 73px);
+    }
+
+    /* ═══════════════════════════════════════════════
+       CARD
+    ═══════════════════════════════════════════════ */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 2rem 2rem 1.75rem;
+      box-shadow: var(--shadow-sm);
+      width: 100%;
+      max-width: 28rem;
+    }
+    .card-heading      { margin-bottom: 1.5rem; }
+    .card-heading h1   { margin-bottom: .25rem; }
+    .card-heading p    { color: var(--muted-fg); }
+
+    /* ═══════════════════════════════════════════════
+       FORM ELEMENTS
+    ═══════════════════════════════════════════════ */
+    .form-stack { display: flex; flex-direction: column; gap: 1rem; }
+
+    .form-group { display: flex; flex-direction: column; }
+
+    .form-control {
+      width: 100%;
+      padding: .5625rem .75rem;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--foreground);
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+      appearance: none;
+    }
+    .form-control::placeholder { color: var(--muted-fg); }
+    .form-control:focus {
+      border-color: var(--ring);
+      box-shadow: 0 0 0 3px rgba(46,125,50,.18);
+    }
+    .form-control.is-error {
+      border-color: var(--destructive);
+    }
+    .form-control.is-error:focus {
+      border-color: var(--destructive);
+      box-shadow: 0 0 0 3px rgba(220,38,38,.15);
+    }
+    .form-control:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      background: var(--muted);
+    }
+
+    /* Select arrow */
+    select.form-control {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right .75rem center;
+      padding-right: 2.5rem;
+      cursor: pointer;
+    }
+
+    /* Password wrapper */
+    .pw-wrap { position: relative; }
+    .pw-wrap .form-control { padding-right: 2.75rem; }
+
+    .pw-toggle {
+      position: absolute;
+      right: .625rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted-fg);
+      cursor: pointer;
+      padding: .25rem;
+      display: flex;
+      align-items: center;
+      border-radius: .375rem;
+      transition: color .15s, background .15s;
+      line-height: 0;
+    }
+    .pw-toggle:hover { color: var(--foreground); background: var(--muted); }
+    .pw-toggle svg { width: 1.125rem; height: 1.125rem; display: block; pointer-events: none; }
+
+    /* Field error text */
+    .field-error {
+      color: var(--destructive);
+      font-size: .8125rem;
+      margin-top: .3rem;
+      display: none;
+    }
+    .field-error.visible { display: block; }
+
+    /* ═══════════════════════════════════════════════
+       ALERT  (destructive)
+    ═══════════════════════════════════════════════ */
+    .alert {
+      display: none;
+      border-radius: var(--radius);
+      padding: .875rem 1rem;
+      margin-bottom: 1.25rem;
+      gap: .75rem;
+      align-items: flex-start;
+    }
+    .alert.visible { display: flex; }
+
+    .alert-destructive {
+      background: var(--destructive-light);
+      border: 1px solid var(--destructive-border);
+      color: var(--destructive);
+    }
+    .alert-icon { flex-shrink: 0; margin-top: 1px; }
+    .alert-icon svg { width: 1rem; height: 1rem; display: block; }
+    .alert-title { font-weight: 600; font-size: .9375rem; margin-bottom: .1rem; }
+    .alert-desc  { font-size: .875rem; color: var(--destructive-dark); }
+
+    /* ═══════════════════════════════════════════════
+       BUTTON
+    ═══════════════════════════════════════════════ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      border: none;
+      border-radius: var(--radius-xl);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s ease, opacity .2s ease, transform .1s ease;
+      line-height: 1;
+    }
+    .btn:active:not(:disabled) { transform: scale(.98); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--primary-fg);
+      padding: .6875rem 1.25rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-h); }
+
+    .btn-full { width: 100%; }
+    .btn-lg   { padding: .75rem 1.5rem; font-size: 1.0625rem; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 1rem; height: 1rem;
+      border: 2px solid rgba(255,255,255,.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════════
+       PASSWORD STRENGTH METER
+    ═══════════════════════════════════════════════ */
+    .pw-strength { margin-top: .5rem; display: none; }
+    .pw-strength.visible { display: block; }
+    .pw-strength-bar {
+      height: 4px;
+      border-radius: 99px;
+      background: var(--border);
+      overflow: hidden;
+      margin-bottom: .3rem;
+    }
+    .pw-strength-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width .3s ease, background .3s ease;
+      width: 0;
+    }
+    .pw-strength-label { font-size: .75rem; color: var(--muted-fg); }
+
+    /* ═══════════════════════════════════════════════
+       FOOTER LINK
+    ═══════════════════════════════════════════════ */
+    .auth-footer {
+      margin-top: 1.5rem;
+      text-align: center;
+      color: var(--muted-fg);
+      font-size: .9375rem;
+    }
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: inherit;
+      font-family: inherit;
+      padding: 0;
+    }
+    .link-btn:hover { text-decoration: underline; }
+    .link-btn:disabled { opacity: .5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOGIN PAGE
+═══════════════════════════════════════════════════════ -->
+<div id="page-login" class="page active">
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="brand" type="button" onclick="showPage('login')">
+        <div class="brand-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <span class="brand-name">CattleTrace</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="auth-center">
+    <div class="card">
+      <div class="card-heading">
+        <h1>Welcome Back</h1>
+        <p>Log in to access livestock traceability tools.</p>
+      </div>
+
+      <!-- Error alert -->
+      <div id="login-alert" class="alert alert-destructive" role="alert" aria-live="polite">
+        <span class="alert-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </span>
+        <div>
+          <div class="alert-title">Sign in failed</div>
+          <div class="alert-desc" id="login-alert-msg"></div>
+        </div>
+      </div>
+
+      <form id="login-form" novalidate class="form-stack" onsubmit="handleLogin(event)">
+
+        <!-- Username -->
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input
+            id="login-username"
+            name="username"
+            type="text"
+            class="form-control"
+            autocomplete="username"
+            placeholder="Enter your username"
+            required
+          />
+          <span class="field-error" id="login-username-error"></span>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <div class="pw-wrap">
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              class="form-control"
+              autocomplete="current-password"
+              placeholder="Enter your password"
+              required
+            />
+            <button type="button" class="pw-toggle"
+                    aria-label="Show password"
+                    onclick="togglePw('login-password', this)">
+              <!-- Eye -->
+              <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <!-- Eye-off (hidden by default) -->
+              <svg class="icon-eyeoff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                   style="display:none">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
+          <span class="field-error" id="login-password-error"></span>
+        </div>
+
+        <!-- Submit -->
+        <div style="margin-top:.25rem">
+          <button id="login-btn" type="submit" class="btn btn-primary btn-full btn-lg">
+            <span class="btn-label">Log in</span>
+            <span class="spinner" style="display:none"></span>
+          </button>
+        </div>
+      </form>
+
+      <p class="auth-footer">
+        Don't have an account?&nbsp;
+        <button type="button" class="link-btn" id="login-to-reg"
+                onclick="showPage('register')">Create an account</button>
+      </p>
+    </div>
+  </main>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     REGISTER PAGE
+═══════════════════════════════════════════════════════ -->
+<div id="page-register" class="page">
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="brand" type="button" onclick="showPage('login')">
+        <div class="brand-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <span class="brand-name">CattleTrace</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="auth-center">
+    <div class="card">
+      <div class="card-heading">
+        <h1>Create Account</h1>
+        <p>Start managing livestock traceability records.</p>
+      </div>
+
+      <!-- Error alert -->
+      <div id="reg-alert" class="alert alert-destructive" role="alert" aria-live="polite">
+        <span class="alert-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </span>
+        <div>
+          <div class="alert-title">Registration failed</div>
+          <div class="alert-desc" id="reg-alert-msg"></div>
+        </div>
+      </div>
+
+      <form id="register-form" novalidate class="form-stack" onsubmit="handleRegister(event)">
+
+        <!-- Username -->
+        <div class="form-group">
+          <label for="reg-username">Username</label>
+          <input
+            id="reg-username"
+            name="username"
+            type="text"
+            class="form-control"
+            autocomplete="username"
+            placeholder="Choose a username"
+            required
+          />
+          <span class="field-error" id="reg-username-error"></span>
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label for="reg-email">Email</label>
+          <input
+            id="reg-email"
+            name="email"
+            type="email"
+            class="form-control"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          />
+          <span class="field-error" id="reg-email-error"></span>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <div class="pw-wrap">
+            <input
+              id="reg-password"
+              name="password"
+              type="password"
+              class="form-control"
+              autocomplete="new-password"
+              placeholder="Minimum 8 characters"
+              required
+              minlength="8"
+              oninput="updateStrength(this.value)"
+            />
+            <button type="button" class="pw-toggle"
+                    aria-label="Show password"
+                    onclick="togglePw('reg-password', this)">
+              <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg class="icon-eyeoff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                   style="display:none">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
+          <!-- Strength meter -->
+          <div class="pw-strength" id="pw-strength-wrap">
+            <div class="pw-strength-bar">
+              <div class="pw-strength-fill" id="pw-strength-fill"></div>
+            </div>
+            <span class="pw-strength-label" id="pw-strength-label"></span>
+          </div>
+          <span class="field-error" id="reg-password-error"></span>
+        </div>
+
+        <!-- Role -->
+        <div class="form-group">
+          <label for="reg-role">Role</label>
+          <select id="reg-role" name="role" class="form-control" required>
+            <option value="farmer">Farmer</option>
+            <option value="buyer">Buyer</option>
+            <option value="vet">Veterinarian</option>
+            <option value="abattoir">Abattoir</option>
+          </select>
+          <span class="field-error" id="reg-role-error"></span>
+        </div>
+
+        <!-- Submit -->
+        <div style="margin-top:.25rem">
+          <button id="reg-btn" type="submit" class="btn btn-primary btn-full btn-lg">
+            <span class="btn-label">Create Account</span>
+            <span class="spinner" style="display:none"></span>
+          </button>
+        </div>
+      </form>
+
+      <p class="auth-footer">
+        Already have an account?&nbsp;
+        <button type="button" class="link-btn" id="reg-to-login"
+                onclick="showPage('login')">Sign in</button>
+      </p>
+    </div>
+  </main>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════ -->
+<script>
+  'use strict';
+
+  /* ─── Page routing ──────────────────────────────────────────────── */
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const target = document.getElementById('page-' + name);
+    if (target) { target.classList.add('active'); window.scrollTo(0, 0); }
+    clearAlerts();
+    clearAllFieldErrors();
+  }
+
+  /* ─── Password toggle ───────────────────────────────────────────── */
+  function togglePw(inputId, btn) {
+    const input   = document.getElementById(inputId);
+    const isHiding = input.type === 'password';
+    input.type = isHiding ? 'text' : 'password';
+
+    const eye    = btn.querySelector('.icon-eye');
+    const eyeoff = btn.querySelector('.icon-eyeoff');
+    eye.style.display    = isHiding ? 'none' : '';
+    eyeoff.style.display = isHiding ? ''     : 'none';
+    btn.setAttribute('aria-label', isHiding ? 'Hide password' : 'Show password');
+    input.focus();
+  }
+
+  /* ─── Password strength ─────────────────────────────────────────── */
+  function scorePassword(pw) {
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    return score; // 0-5
+  }
+
+  function updateStrength(pw) {
+    const wrap  = document.getElementById('pw-strength-wrap');
+    const fill  = document.getElementById('pw-strength-fill');
+    const label = document.getElementById('pw-strength-label');
+
+    if (!pw) { wrap.classList.remove('visible'); return; }
+    wrap.classList.add('visible');
+
+    const score = scorePassword(pw);
+    const levels = [
+      { w: '20%',  color: '#DC2626', text: 'Very weak'  },
+      { w: '40%',  color: '#F59E0B', text: 'Weak'       },
+      { w: '60%',  color: '#F59E0B', text: 'Fair'       },
+      { w: '80%',  color: '#16A34A', text: 'Strong'     },
+      { w: '100%', color: '#2E7D32', text: 'Very strong' },
+    ];
+    const lvl = levels[Math.max(0, Math.min(score - 1, 4))];
+    fill.style.width      = lvl.w;
+    fill.style.background = lvl.color;
+    label.textContent     = lvl.text;
+    label.style.color     = lvl.color;
+  }
+
+  /* ─── Alert helpers ─────────────────────────────────────────────── */
+  function showAlert(alertId, msgId, msg) {
+    const el = document.getElementById(alertId);
+    document.getElementById(msgId).textContent = msg;
+    el.classList.add('visible');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function hideAlert(alertId) {
+    document.getElementById(alertId).classList.remove('visible');
+  }
+  function clearAlerts() {
+    document.querySelectorAll('.alert').forEach(el => el.classList.remove('visible'));
+  }
+
+  /* ─── Field error helpers ───────────────────────────────────────── */
+  function setFieldError(inputId, errorId, msg) {
+    const inp = document.getElementById(inputId);
+    const err = document.getElementById(errorId);
+    if (inp) inp.classList.add('is-error');
+    if (err) { err.textContent = msg; err.classList.add('visible'); }
+  }
+  function clearFieldError(inputId, errorId) {
+    const inp = document.getElementById(inputId);
+    const err = document.getElementById(errorId);
+    if (inp) inp.classList.remove('is-error');
+    if (err) { err.textContent = ''; err.classList.remove('visible'); }
+  }
+  function clearAllFieldErrors() {
+    document.querySelectorAll('.form-control').forEach(el => el.classList.remove('is-error'));
+    document.querySelectorAll('.field-error').forEach(el => {
+      el.textContent = ''; el.classList.remove('visible');
+    });
+  }
+
+  /* ─── Button loading state ──────────────────────────────────────── */
+  function setLoading(btnId, loading, loadingText) {
+    const btn     = document.getElementById(btnId);
+    const label   = btn.querySelector('.btn-label');
+    const spinner = btn.querySelector('.spinner');
+    btn.disabled        = loading;
+    label.textContent   = loading ? loadingText : btn.dataset.defaultLabel;
+    spinner.style.display = loading ? '' : 'none';
+
+    // Disable sibling nav links
+    const page = btn.closest('.page');
+    page.querySelectorAll('.link-btn').forEach(lb => lb.disabled = loading);
+  }
+
+  // Store default labels on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    ['login-btn', 'reg-btn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.dataset.defaultLabel = btn.querySelector('.btn-label').textContent;
+    });
+  });
+
+  /* ─── Client-side validation ────────────────────────────────────── */
+  function validate(rules) {
+    let ok = true;
+    rules.forEach(({ inputId, errorId, checks }) => {
+      const val = document.getElementById(inputId).value.trim();
+      clearFieldError(inputId, errorId);
+      for (const { test, msg } of checks) {
+        if (!test(val)) {
+          setFieldError(inputId, errorId, msg);
+          ok = false;
+          break;
+        }
+      }
+    });
+    return ok;
+  }
+
+  /* ─── DRF error parser ──────────────────────────────────────────── */
+  function parseApiErrors(data) {
+    const global = data?.detail
+      || (Array.isArray(data?.non_field_errors) ? data.non_field_errors[0] : null)
+      || null;
+    return { global, fields: data };
+  }
+
+  /* ─── LOGIN ─────────────────────────────────────────────────────── */
+  async function handleLogin(e) {
+    e.preventDefault();
+    clearAlerts();
+    clearAllFieldErrors();
+
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    const valid = validate([
+      { inputId: 'login-username', errorId: 'login-username-error', checks: [
+        { test: v => v.length > 0, msg: 'Username is required.' }
+      ]},
+      { inputId: 'login-password', errorId: 'login-password-error', checks: [
+        { test: v => v.length > 0, msg: 'Password is required.' }
+      ]},
+    ]);
+    if (!valid) return;
+
+    setLoading('login-btn', true, 'Signing in…');
+
+    try {
+      const res  = await fetch('/api/v1/auth/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        const { global, fields } = parseApiErrors(data);
+        showAlert('login-alert', 'login-alert-msg',
+          global || 'Invalid credentials. Please try again.');
+        if (fields.username) setFieldError('login-username', 'login-username-error', fields.username);
+        if (fields.password) setFieldError('login-password', 'login-password-error', fields.password);
+        return;
+      }
+
+      localStorage.setItem('ct_access',  data.access);
+      localStorage.setItem('ct_refresh', data.refresh);
+      if (data.user) localStorage.setItem('ct_user', JSON.stringify(data.user));
+      window.location.href = '/';
+
+    } catch {
+      showAlert('login-alert', 'login-alert-msg',
+        'Unable to sign in. Check your network connection and try again.');
+    } finally {
+      setLoading('login-btn', false);
+    }
+  }
+
+  /* ─── REGISTER ──────────────────────────────────────────────────── */
+  async function handleRegister(e) {
+    e.preventDefault();
+    clearAlerts();
+    clearAllFieldErrors();
+
+    const username = document.getElementById('reg-username').value.trim();
+    const email    = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const role     = document.getElementById('reg-role').value;
+
+    const valid = validate([
+      { inputId: 'reg-username', errorId: 'reg-username-error', checks: [
+        { test: v => v.length > 0,  msg: 'Username is required.' },
+        { test: v => v.length >= 3, msg: 'Username must be at least 3 characters.' },
+      ]},
+      { inputId: 'reg-email', errorId: 'reg-email-error', checks: [
+        { test: v => v.length > 0, msg: 'Email is required.' },
+        { test: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), msg: 'Enter a valid email address.' },
+      ]},
+      { inputId: 'reg-password', errorId: 'reg-password-error', checks: [
+        { test: v => v.length > 0,  msg: 'Password is required.' },
+        { test: v => v.length >= 8, msg: 'Password must be at least 8 characters.' },
+      ]},
+    ]);
+    if (!valid) return;
+
+    setLoading('reg-btn', true, 'Creating account…');
+
+    try {
+      const res  = await fetch('/api/v1/auth/register/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password, role }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        const { global, fields } = parseApiErrors(data);
+        showAlert('reg-alert', 'reg-alert-msg',
+          global || 'Registration failed. Please review the form and try again.');
+        if (fields.username) setFieldError('reg-username', 'reg-username-error', fields.username);
+        if (fields.email)    setFieldError('reg-email',    'reg-email-error',    fields.email);
+        if (fields.password) setFieldError('reg-password', 'reg-password-error', fields.password);
+        if (fields.role)     setFieldError('reg-role',     'reg-role-error',     fields.role);
+        return;
+      }
+
+      // Auto-login after successful registration
+      const loginRes = await fetch('/api/v1/auth/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (loginRes.ok) {
+        const tokens = await loginRes.json();
+        localStorage.setItem('ct_access',  tokens.access);
+        localStorage.setItem('ct_refresh', tokens.refresh);
+        if (tokens.user) localStorage.setItem('ct_user', JSON.stringify(tokens.user));
+        window.location.href = '/';
+      } else {
+        // Registration succeeded but auto-login failed — redirect to login
+        showPage('login');
+        showAlert('login-alert', 'login-alert-msg',
+          'Account created! Please log in with your new credentials.');
+      }
+
+    } catch {
+      showAlert('reg-alert', 'reg-alert-msg',
+        'Unable to create account. Check your network connection and try again.');
+    } finally {
+      setLoading('reg-btn', false);
+    }
+  }
+</script>
+</body>
+</html>

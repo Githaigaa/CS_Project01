@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Building2, CheckCircle, Clock, Shield, FileText, Plus, Loader2 } from "lucide-react";
+import { Building2, CheckCircle, Clock, Shield, FileText, Plus, Loader2, Search, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
@@ -9,6 +9,7 @@ import { formatDate } from "../lib/utils";
 import type { SlaughterRecord } from "../lib/types";
 import { getApiErrorMessage } from "../services/api/errors";
 import { slaughterApi } from "../services/api/slaughter";
+import { apiClient } from "../services/api/client";
 
 const PAGE_SIZE = 10;
 
@@ -21,6 +22,75 @@ export function Abattoirs() {
   const [hasPrev, setHasPrev] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-slaughter verification
+  const [verifyTag, setVerifyTag] = useState("");
+  const [verifyResult, setVerifyResult] = useState<{ eligible: boolean; reason?: string; has_slaughter_movement_record?: boolean; animal?: Record<string, unknown> } | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // Slaughter form
+  const [slaughterForm, setSlaughterForm] = useState({
+    animal_tag: "", abattoir: "", slaughter_no: "", slaughter_date: "",
+    live_weight_kg: "", carcass_weight_kg: "", inspection_result: "", meat_grade: "", notes: "",
+  });
+  const [abattoirs, setAbattoirs] = useState<Array<{ id: number; name: string }>>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    slaughterApi.listAbattoirs().then((list) => setAbattoirs(list)).catch(() => {});
+  }, []);
+
+  async function handleVerify() {
+    if (!verifyTag.trim()) return;
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    try {
+      const { data } = await apiClient.get(`/slaughter-records/verify/${verifyTag.trim()}/`);
+      setVerifyResult(data);
+    } catch (err) {
+      setVerifyResult({ eligible: false, reason: getApiErrorMessage(err, "Animal not found.") });
+    } finally {
+      setVerifyLoading(false);
+    }
+  }
+
+  async function handleSlaughterSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const { data: animalData } = await apiClient.get(`/animals/`, {
+        params: { search: slaughterForm.animal_tag },
+      });
+      const animals = Array.isArray(animalData) ? animalData : animalData.results ?? [];
+      const match = animals.find(
+        (a: { tag_number: string; rfid_tag: string }) =>
+          a.tag_number === slaughterForm.animal_tag || a.rfid_tag === slaughterForm.animal_tag
+      );
+      if (!match) throw new Error("Animal not found for that RFID/tag.");
+
+      await apiClient.post("/slaughter-records/", {
+        animal: match.id,
+        abattoir: slaughterForm.abattoir ? Number(slaughterForm.abattoir) : undefined,
+        slaughter_no: slaughterForm.slaughter_no,
+        slaughter_date: slaughterForm.slaughter_date,
+        live_weight_kg: slaughterForm.live_weight_kg,
+        carcass_weight_kg: slaughterForm.carcass_weight_kg,
+        inspection_result: slaughterForm.inspection_result || "passed",
+        meat_grade: slaughterForm.meat_grade,
+        notes: slaughterForm.notes,
+      });
+      setShowForm(false);
+      setSlaughterForm({ animal_tag: "", abattoir: "", slaughter_no: "", slaughter_date: "", live_weight_kg: "", carcass_weight_kg: "", inspection_result: "", meat_grade: "", notes: "" });
+      setVerifyResult(null);
+      setVerifyTag("");
+      setPage(1);
+    } catch (err) {
+      setSubmitError(getApiErrorMessage(err, "Failed to record slaughter."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     let isCurrent = true;
@@ -172,39 +242,121 @@ export function Abattoirs() {
           <CardHeader>
             <CardTitle>Record Slaughter Event</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Pre-slaughter verification */}
+            <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">
+              <div className="font-medium flex items-center gap-2">
+                <Search className="w-4 h-4" /> Pre-Slaughter Verification
+              </div>
+              <div className="flex gap-3">
+                <Input
+                  placeholder="Animal RFID or Tag Number"
+                  value={verifyTag}
+                  onChange={(e) => setVerifyTag(e.target.value)}
+                />
+                <div className="flex items-end">
+                  <Button variant="outline" onClick={handleVerify} disabled={verifyLoading || !verifyTag.trim()}>
+                    {verifyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify"}
+                  </Button>
+                </div>
+              </div>
+              {verifyResult && (
+                <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${
+                  verifyResult.eligible
+                    ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200"
+                    : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                }`}>
+                  {verifyResult.eligible
+                    ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    : <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+                  <span>
+                    {verifyResult.eligible
+                      ? `Animal is eligible for slaughter.${!verifyResult.has_slaughter_movement_record ? " Note: No slaughter movement record found." : ""}`
+                      : verifyResult.reason}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Slaughter details form */}
+            {submitError && (
+              <div className="text-destructive text-sm">{submitError}</div>
+            )}
             <div className="grid md:grid-cols-2 gap-4">
-              <Input label="Animal RFID *" placeholder="254000123456789" />
-              <Select label="Abattoir *">
+              <Input
+                label="Animal RFID / Tag *"
+                placeholder="254000123456789"
+                value={slaughterForm.animal_tag}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, animal_tag: e.target.value }))}
+              />
+              <Select
+                label="Abattoir *"
+                value={slaughterForm.abattoir}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, abattoir: e.target.value }))}
+              >
                 <option value="">Select abattoir</option>
-                <option value="KE-AB-001">Nairobi Modern Abattoir</option>
-                <option value="KE-AB-002">Mombasa Export Abattoir</option>
-                <option value="KE-AB-003">Nakuru County Abattoir</option>
+                {abattoirs.map((a) => (
+                  <option key={a.id} value={String(a.id)}>{a.name}</option>
+                ))}
               </Select>
-              <Input label="Chain Number *" placeholder="NMA-2026-05432" />
-              <Input label="Carcass ID *" placeholder="CARC-20260606-001" />
-              <Input label="Slaughter Date *" type="date" />
-              <Select label="Grade">
+              <Input
+                label="Slaughter / Chain Number *"
+                placeholder="NMA-2026-05432"
+                value={slaughterForm.slaughter_no}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, slaughter_no: e.target.value }))}
+              />
+              <Input
+                label="Slaughter Date *"
+                type="date"
+                value={slaughterForm.slaughter_date}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, slaughter_date: e.target.value }))}
+              />
+              <Input
+                label="Live Weight (kg) *"
+                type="number"
+                placeholder="450"
+                value={slaughterForm.live_weight_kg}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, live_weight_kg: e.target.value }))}
+              />
+              <Input
+                label="Carcass Weight (kg) *"
+                type="number"
+                placeholder="260"
+                value={slaughterForm.carcass_weight_kg}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, carcass_weight_kg: e.target.value }))}
+              />
+              <Select
+                label="Inspection Result *"
+                value={slaughterForm.inspection_result}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, inspection_result: e.target.value }))}
+              >
+                <option value="">Select result</option>
+                <option value="passed">Passed</option>
+                <option value="passed_partial">Passed (Partial Condemnation)</option>
+                <option value="condemned">Condemned</option>
+              </Select>
+              <Select
+                label="Meat Grade"
+                value={slaughterForm.meat_grade}
+                onChange={(e) => setSlaughterForm((f) => ({ ...f, meat_grade: e.target.value }))}
+              >
                 <option value="">Select grade</option>
                 <option value="A">Grade A</option>
                 <option value="B">Grade B</option>
                 <option value="C">Grade C</option>
               </Select>
               <div className="md:col-span-2">
-                <Textarea label="Feedback/Notes" placeholder="Carcass quality, marbling, any observations..." />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block mb-2 font-medium">Attachments</label>
-                <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary transition-colors cursor-pointer">
-                  <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <div className="text-muted-foreground">Upload inspection reports, photos, certificates</div>
-                </div>
+                <Textarea
+                  label="Notes / Feedback"
+                  placeholder="Carcass quality, marbling, any observations..."
+                  value={slaughterForm.notes}
+                  onChange={(e) => setSlaughterForm((f) => ({ ...f, notes: e.target.value }))}
+                />
               </div>
               <div className="md:col-span-2 flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowForm(false)}>
-                  Cancel
-                </Button>
-                <Button>
+                <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+                <Button onClick={handleSlaughterSubmit} disabled={submitting}>
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Submit Record
                 </Button>
               </div>

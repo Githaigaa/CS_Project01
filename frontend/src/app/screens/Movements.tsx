@@ -17,6 +17,8 @@ import type { Movement } from "../lib/types";
 import { animalsApi } from "../services/api/animals";
 import { getApiErrorMessage } from "../services/api/errors";
 import { movementsApi } from "../services/api/movements";
+import { holdingsApi } from "../services/api/holdings";
+import type { ApiFarm } from "../lib/api/holdings";
 
 type FormState = {
   animalRfid: string;
@@ -40,16 +42,10 @@ const emptyForm: FormState = {
   notes: "",
 };
 
-const holdingOptions = [
-  { value: "1", label: "Kiambu Dairy Farm" },
-  { value: "2", label: "Kisumu Livestock Ranch" },
-  { value: "3", label: "Nakuru Valley Dairy" },
-  { value: "4", label: "Dagoretti Livestock Market" },
-];
-
-function getHoldingLabel(value: string | number | null | undefined) {
+function getHoldingLabel(farms: ApiFarm[], value: string | number | null | undefined) {
   if (!value) return "";
-  return holdingOptions.find((option) => option.value === String(value))?.label || `Holding #${value}`;
+  const farm = farms.find((f) => String(f.id) === String(value));
+  return farm ? farm.name : `Holding #${value}`;
 }
 
 function purposeFromUi(value: string): ApiMovementPurpose | "" {
@@ -88,11 +84,16 @@ export function Movements() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingMovementId, setEditingMovementId] = useState<number | null>(null);
   const [deletingMovementId, setDeletingMovementId] = useState<number | null>(null);
+  const [farms, setFarms] = useState<ApiFarm[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const pageSize = 10;
+
+  useEffect(() => {
+    holdingsApi.listHoldings({ pageSize: 100 }).then((res) => setFarms(res.results)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -273,10 +274,10 @@ export function Movements() {
       permit: permitId,
       origin_farm: Number(form.originHolding),
       destination_farm: Number(form.destinationHolding),
-      origin_county: getHoldingLabel(form.originHolding),
+      origin_county: getHoldingLabel(farms, form.originHolding),
       destination_county: form.crossBorder
-        ? `${getHoldingLabel(form.destinationHolding)} Cross-Border`
-        : getHoldingLabel(form.destinationHolding),
+        ? `${getHoldingLabel(farms, form.destinationHolding)} Cross-Border`
+        : getHoldingLabel(farms, form.destinationHolding),
       move_date: form.movementDate,
       purpose: form.purpose,
       transporter: form.notes.trim(),
@@ -485,9 +486,8 @@ export function Movements() {
                 onChange={(event) => updateForm("originHolding", event.target.value)}
               >
                 <option value="">Select origin</option>
-                <option value="1">Kiambu Dairy Farm</option>
-                <option value="2">Kisumu Livestock Ranch</option>
-                <option value="3">Nakuru Valley Dairy</option>
+                {farms.length === 0 && <option disabled>No holdings registered yet</option>}
+                {farms.map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
               </Select>
               <Select
                 label="Destination Holding *"
@@ -495,9 +495,8 @@ export function Movements() {
                 onChange={(event) => updateForm("destinationHolding", event.target.value)}
               >
                 <option value="">Select destination</option>
-                <option value="1">Kiambu Dairy Farm</option>
-                <option value="2">Nakuru Valley Dairy</option>
-                <option value="3">Dagoretti Livestock Market</option>
+                {farms.length === 0 && <option disabled>No holdings registered yet</option>}
+                {farms.map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
               </Select>
               <Input
                 label="Movement Date *"

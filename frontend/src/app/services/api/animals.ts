@@ -55,4 +55,17 @@ export const animalsApi = {
   async deleteAnimal(tagNumber: string): Promise<void> {
     await apiClient.delete(`/animals/${encodeURIComponent(tagNumber)}/`);
   },
+
+  async uploadPhoto(tagNumber: string, file: File, order: number): Promise<void> {
+    const form = new FormData();
+    form.append("image", file);
+    form.append("order", String(order));
+    await apiClient.post(`/animals/${encodeURIComponent(tagNumber)}/photos/`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  async addPhotoUrl(tagNumber: string, url: string, order: number): Promise<void> {
+    await apiClient.post(`/animals/${encodeURIComponent(tagNumber)}/photos/`, { url, order });
+  },
 };

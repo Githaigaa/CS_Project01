@@ -3,6 +3,8 @@
 export type ApiUserRole =
   | "farmer"
   | "vet"
+  | "cahw"
+  | "dvs"
   | "inspector"
   | "buyer"
   | "abattoir"
@@ -67,4 +69,18 @@ export interface RegisterPayload {
 export interface LoginPayload {
   username: string;
   password: string;
+}
+
+export interface PasswordResetRequestPayload {
+  email: string;
+}
+
+export interface PasswordResetVerifyOtpPayload {
+  email: string;
+  otp: string;
+}
+
+export interface PasswordResetConfirmPayload {
+  reset_token: string;
+  new_password: string;
 }

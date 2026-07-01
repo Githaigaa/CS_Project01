@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CattleTrace — Animal Registry</title>
+  <meta name="description" content="Manage and track all registered animals in the CattleTrace system." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════════ */
+    :root {
+      --primary:        #2E7D32;
+      --primary-h:      #256429;
+      --primary-fg:     #ffffff;
+      --secondary:      #1565C0;
+      --accent:         #FF9800;
+      --background:     #F8FAFC;
+      --foreground:     #1E293B;
+      --card:           #ffffff;
+      --muted:          #F1F5F9;
+      --muted-fg:       #64748B;
+      --border:         #E2E8F0;
+      --input-bg:       #ffffff;
+      --ring:           #2E7D32;
+      --destructive:    #DC2626;
+      --success:        #16A34A;
+      --warning:        #F59E0B;
+      --info:           #0EA5E9;
+      --radius:         0.75rem;
+      --radius-xl:      1rem;
+      --shadow-sm:      0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.10);
+      --shadow-md:      0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+    }
+
+    /* ═══════════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 { font-size: 1.5rem;  font-weight: 600; line-height: 1.3; }
+    h2 { font-size: 1.25rem; font-weight: 600; }
+    h3 { font-size: 1.0625rem; font-weight: 600; }
+    label  { font-size: 1rem; font-weight: 500; display: block; margin-bottom: .375rem; }
+    button { font-family: inherit; font-size: 1rem; font-weight: 500; cursor: pointer; }
+    input, select, textarea { font-family: inherit; font-size: 1rem; font-weight: 400; }
+    table  { border-collapse: collapse; width: 100%; }
+
+    /* ═══════════════════════════════════════════════
+       LAYOUT — sidebar + main
+    ═══════════════════════════════════════════════ */
+    .app { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 15rem;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      z-index: 20;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: .625rem;
+      padding: 1.25rem 1rem;
+      border-bottom: 1px solid var(--border);
+      text-decoration: none;
+      color: var(--foreground);
+    }
+    .brand-icon {
+      width: 2.25rem; height: 2.25rem;
+      background: var(--primary);
+      border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .brand-icon svg { width: 1.25rem; height: 1.25rem; color: #fff; display: block; }
+    .brand-name { font-size: 1rem; font-weight: 700; }
+
+    .sidebar-nav { padding: .75rem .75rem; flex: 1; }
+    .nav-section-label {
+      font-size: .6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted-fg);
+      padding: .5rem .625rem .25rem;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: .625rem;
+      padding: .5625rem .75rem;
+      border-radius: var(--radius);
+      color: var(--muted-fg);
+      text-decoration: none;
+      font-size: .9375rem;
+      font-weight: 500;
+      border: none;
+      background: none;
+      width: 100%;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      margin-bottom: .125rem;
+    }
+    .nav-item:hover { background: var(--muted); color: var(--foreground); }
+    .nav-item.active {
+      background: rgba(46,125,50,.1);
+      color: var(--primary);
+    }
+    .nav-item svg { width: 1.125rem; height: 1.125rem; flex-shrink: 0; }
+
+    /* Main area */
+    .main-wrap {
+      margin-left: 15rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top nav */
+    .top-nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: .875rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .top-nav-title { font-size: 1rem; font-weight: 600; }
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: .625rem;
+      font-size: .9rem;
+      color: var(--muted-fg);
+    }
+    .user-avatar {
+      width: 2rem; height: 2rem;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: .8125rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    /* Page content */
+    .page-content { padding: 1.5rem; flex: 1; }
+
+    /* ═══════════════════════════════════════════════
+       CARDS
+    ═══════════════════════════════════════════════ */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-sm);
+    }
+    .card-padded { padding: 1.25rem 1.5rem; }
+    .card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h3 { margin: 0; }
+
+    /* ═══════════════════════════════════════════════
+       STAT CARDS ROW
+    ═══════════════════════════════════════════════ */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .stat-inner { display: flex; align-items: flex-start; justify-content: space-between; }
+    .stat-label { font-size: .8125rem; color: var(--muted-fg); font-weight: 500; margin-bottom: .3rem; }
+    .stat-value { font-size: 1.875rem; font-weight: 600; line-height: 1.1; }
+    .stat-icon {
+      width: 2.75rem; height: 2.75rem;
+      border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .stat-icon svg { width: 1.375rem; height: 1.375rem; display: block; }
+
+    /* ═══════════════════════════════════════════════
+       FORM CONTROLS
+    ═══════════════════════════════════════════════ */
+    .form-control {
+      width: 100%;
+      padding: .5rem .75rem;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--foreground);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .form-control::placeholder { color: var(--muted-fg); }
+    .form-control:focus {
+      border-color: var(--ring);
+      box-shadow: 0 0 0 3px rgba(46,125,50,.18);
+    }
+    .form-control.is-error {
+      border-color: var(--destructive);
+    }
+    .form-control:disabled { opacity: .5; cursor: not-allowed; background: var(--muted); }
+
+    select.form-control {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right .75rem center;
+      padding-right: 2.5rem;
+      cursor: pointer;
+    }
+    textarea.form-control {
+      min-height: 6rem;
+      resize: vertical;
+    }
+    .field-error {
+      color: var(--destructive);
+      font-size: .8125rem;
+      margin-top: .25rem;
+      display: none;
+    }
+    .field-error.visible { display: block; }
+
+    /* Search with icon */
+    .search-wrap { position: relative; }
+    .search-wrap .search-icon {
+      position: absolute;
+      left: .75rem; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted-fg);
+      pointer-events: none;
+    }
+    .search-wrap .search-icon svg { width: 1rem; height: 1rem; display: block; }
+    .search-wrap .form-control { padding-left: 2.375rem; }
+
+    /* ═══════════════════════════════════════════════
+       BUTTONS
+    ═══════════════════════════════════════════════ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .425rem;
+      border: none;
+      border-radius: var(--radius-xl);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, opacity .2s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active:not(:disabled) { transform: scale(.98); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn svg { width: 1rem; height: 1rem; display: block; flex-shrink: 0; }
+
+    .btn-sm  { padding: .375rem .875rem; font-size: .875rem; border-radius: var(--radius); }
+    .btn-md  { padding: .5rem 1.125rem; font-size: .9375rem; }
+    .btn-lg  { padding: .6875rem 1.5rem; font-size: 1rem; }
+
+    .btn-primary  { background: var(--primary);     color: var(--primary-fg); box-shadow: var(--shadow-sm); }
+    .btn-primary:hover:not(:disabled)  { background: var(--primary-h); }
+
+    .btn-outline  {
+      background: transparent;
+      color: var(--foreground);
+      border: 2px solid var(--border);
+    }
+    .btn-outline:hover:not(:disabled)  { background: var(--muted); }
+
+    .btn-ghost    { background: transparent; color: var(--muted-fg); border: none; }
+    .btn-ghost:hover:not(:disabled)   { background: var(--muted); color: var(--foreground); }
+
+    .btn-danger   { background: var(--destructive); color: #fff; }
+    .btn-danger:hover:not(:disabled)  { background: #b91c1c; }
+
+    .btn-icon {
+      padding: .4rem;
+      border-radius: .5rem;
+      background: none;
+      border: none;
+      color: var(--muted-fg);
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .btn-icon:hover { background: var(--muted); color: var(--foreground); }
+    .btn-icon.danger:hover { background: #FEE2E2; color: var(--destructive); }
+    .btn-icon svg { width: 1rem; height: 1rem; display: block; }
+    .btn-icon:disabled { opacity: .4; cursor: not-allowed; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: .9rem; height: .9rem;
+      border: 2px solid rgba(255,255,255,.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+      flex-shrink: 0;
+    }
+    .spinner-dark {
+      border-color: rgba(0,0,0,.15);
+      border-top-color: var(--foreground);
+    }
+
+    /* ═══════════════════════════════════════════════
+       BADGES
+    ═══════════════════════════════════════════════ */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: .1875rem .625rem;
+      border-radius: 99px;
+      font-size: .75rem;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .badge-success    { background: #DCFCE7; color: #15803D; }
+    .badge-warning    { background: #FEF3C7; color: #B45309; }
+    .badge-danger     { background: #FEE2E2; color: var(--destructive); }
+    .badge-info       { background: #E0F2FE; color: #0369A1; }
+    .badge-secondary  { background: var(--muted); color: var(--muted-fg); }
+    .badge-default    { background: #F1F5F9; color: var(--foreground); }
+
+    /* ═══════════════════════════════════════════════
+       TABLE
+    ═══════════════════════════════════════════════ */
+    .table-wrap { overflow-x: auto; }
+    table thead th {
+      text-align: left;
+      padding: .75rem 1rem;
+      font-size: .8125rem;
+      font-weight: 600;
+      color: var(--muted-fg);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    table tbody tr:last-child { border-bottom: none; }
+    table tbody tr:hover { background: rgba(241,245,249,.6); }
+    table tbody td {
+      padding: .75rem 1rem;
+      font-size: .9375rem;
+      vertical-align: middle;
+    }
+    .td-mono { font-family: 'Courier New', monospace; font-size: .8125rem; }
+    .actions-cell { display: flex; gap: .25rem; align-items: center; }
+
+    /* Empty / loading state */
+    .table-msg {
+      padding: 3rem 1rem;
+      text-align: center;
+      color: var(--muted-fg);
+    }
+    .table-msg svg { width: 2.5rem; height: 2.5rem; margin: 0 auto .75rem; display: block; opacity: .4; }
+
+    /* ═══════════════════════════════════════════════
+       ALERT
+    ═══════════════════════════════════════════════ */
+    .alert {
+      display: none;
+      border-radius: var(--radius);
+      padding: .875rem 1rem;
+      gap: .75rem;
+      align-items: flex-start;
+      font-size: .9375rem;
+    }
+    .alert.visible { display: flex; }
+    .alert-destructive {
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      color: var(--destructive);
+    }
+    .alert-icon svg { width: 1rem; height: 1rem; display: block; }
+    .alert-title { font-weight: 600; font-size: .9375rem; }
+    .alert-desc { font-size: .875rem; color: #991B1B; }
+
+    /* ═══════════════════════════════════════════════
+       MODAL OVERLAY
+    ═══════════════════════════════════════════════ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md);
+      width: 100%;
+      max-width: 36rem;
+      max-height: 92vh;
+      overflow-y: auto;
+      animation: modal-in .2s ease;
+    }
+    @keyframes modal-in {
+      from { opacity: 0; transform: translateY(-10px) scale(.97); }
+      to   { opacity: 1; transform: none; }
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { margin: 0; }
+    .modal-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted-fg);
+      padding: .25rem;
+      border-radius: .375rem;
+      display: flex;
+      align-items: center;
+      transition: background .15s, color .15s;
+    }
+    .modal-close:hover { background: var(--muted); color: var(--foreground); }
+    .modal-close svg { width: 1.25rem; height: 1.25rem; display: block; }
+
+    .modal-body { padding: 1.5rem; }
+    .modal-footer {
+      display: flex;
+      gap: .75rem;
+      justify-content: flex-end;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-group { display: flex; flex-direction: column; }
+
+    /* ═══════════════════════════════════════════════
+       DETAIL PANEL (slide in from right)
+    ═══════════════════════════════════════════════ */
+    .detail-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      z-index: 90;
+    }
+    .detail-overlay.open { display: block; }
+    .detail-panel {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 26rem;
+      max-width: 92vw;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
+      overflow-y: auto;
+      z-index: 91;
+      transform: translateX(100%);
+      transition: transform .25s ease;
+    }
+    .detail-overlay.open .detail-panel { transform: none; }
+    .detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      z-index: 2;
+    }
+    .detail-body { padding: 1.5rem; }
+    .detail-row  { margin-bottom: 1.25rem; }
+    .detail-label { font-size: .8125rem; color: var(--muted-fg); margin-bottom: .2rem; }
+    .detail-value { font-weight: 500; }
+    .detail-icon-wrap {
+      width: 4rem; height: 4rem;
+      background: rgba(46,125,50,.1);
+      border-radius: var(--radius-xl);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    .detail-icon-wrap svg { width: 2rem; height: 2rem; color: var(--primary); display: block; }
+
+    /* ═══════════════════════════════════════════════
+       PAGINATION
+    ═══════════════════════════════════════════════ */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .875rem 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .pagination-info { font-size: .875rem; color: var(--muted-fg); }
+    .pagination-btns { display: flex; gap: .5rem; }
+
+    /* ═══════════════════════════════════════════════
+       UTILITIES
+    ═══════════════════════════════════════════════ */
+    .flex         { display: flex; }
+    .items-center { align-items: center; }
+    .gap-2        { gap: .5rem; }
+    .gap-3        { gap: .75rem; }
+    .gap-4        { gap: 1rem; }
+    .mb-1         { margin-bottom: .25rem; }
+    .mb-2         { margin-bottom: .5rem; }
+    .mb-4         { margin-bottom: 1rem; }
+    .mb-6         { margin-bottom: 1.5rem; }
+    .mt-4         { margin-top: 1rem; }
+    .text-sm      { font-size: .875rem; }
+    .text-muted   { color: var(--muted-fg); }
+    .font-mono    { font-family: 'Courier New', monospace; font-size: .85em; }
+    .hidden       { display: none !important; }
+
+    /* Filter bar */
+    .filter-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr auto;
+      gap: .75rem;
+      align-items: end;
+    }
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main-wrap { margin-left: 0; }
+      .filter-bar { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .detail-panel { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+  <aside class="sidebar">
+    <a class="sidebar-brand" href="#">
+      <div class="brand-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <span class="brand-name">CattleTrace</span>
+    </a>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a class="nav-item active" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Animal Registry
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Holdings
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Movements
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 14 19.79 19.79 0 0 1 1.26 5.38A2 2 0 0 1 3.24 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10a16 16 0 0 0 6 6l.53-.53a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 18z"/></svg>
+        Health Records
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Marketplace
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ═══════════════════════ MAIN ═══════════════════════ -->
+  <div class="main-wrap">
+    <!-- Top nav -->
+    <div class="top-nav">
+      <span class="top-nav-title">Animal Registry</span>
+      <div class="user-badge">
+        <div class="user-avatar" id="user-avatar-initials">U</div>
+        <span id="user-display-name">User</span>
+      </div>
+    </div>
+
+    <!-- Page content -->
+    <main class="page-content">
+
+      <!-- Page header -->
+      <div class="flex items-center mb-6" style="justify-content:space-between">
+        <div>
+          <h1 class="mb-1">Animal Registry</h1>
+          <p class="text-muted text-sm">Manage and track all registered animals</p>
+        </div>
+        <button class="btn btn-primary btn-md" onclick="openCreateModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Register New Animal
+        </button>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-grid" id="stats-row">
+        <div class="stat-card">
+          <div class="stat-inner">
+            <div>
+              <div class="stat-label">Total Animals</div>
+              <div class="stat-value" id="stat-total">—</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(46,125,50,.1)">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 7.65l1.06 1.06L12 21.23l7.77-7.94 1.06-1.06a5.4 5.4 0 0 0-.41-7.65z"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-inner">
+            <div>
+              <div class="stat-label">Active</div>
+              <div class="stat-value" id="stat-active">—</div>
+            </div>
+            <div class="stat-icon" style="background:#DCFCE7">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-inner">
+            <div>
+              <div class="stat-label">For Sale</div>
+              <div class="stat-value" id="stat-forsale">—</div>
+            </div>
+            <div class="stat-icon" style="background:#FEF3C7">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-inner">
+            <div>
+              <div class="stat-label">Sold</div>
+              <div class="stat-value" id="stat-sold">—</div>
+            </div>
+            <div class="stat-icon" style="background:#E0F2FE">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0369A1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter / search bar -->
+      <div class="card card-padded mb-4">
+        <div class="filter-bar" id="filter-bar">
+          <div class="search-wrap">
+            <span class="search-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input id="search-input" class="form-control" type="search"
+                   placeholder="Search by tag, breed, owner…" oninput="onFilterChange()" />
+          </div>
+          <select id="filter-species" class="form-control" onchange="onFilterChange()">
+            <option value="">All Species</option>
+            <option value="cattle">Cattle</option>
+            <option value="goat">Goat</option>
+            <option value="sheep">Sheep</option>
+            <option value="camel">Camel</option>
+            <option value="donkey">Donkey</option>
+          </select>
+          <select id="filter-status" class="form-control" onchange="onFilterChange()">
+            <option value="">All Status</option>
+            <option value="alive">Active</option>
+            <option value="for_sale">For Sale</option>
+            <option value="sold">Sold</option>
+            <option value="slaughtered">Slaughtered</option>
+            <option value="deceased">Deceased</option>
+          </select>
+          <select id="filter-ordering" class="form-control" onchange="onFilterChange()">
+            <option value="-registration_date">Newest first</option>
+            <option value="registration_date">Oldest first</option>
+            <option value="tag_number">Tag A–Z</option>
+            <option value="-tag_number">Tag Z–A</option>
+          </select>
+        </div>
+
+        <!-- Action error -->
+        <div id="action-alert" class="alert alert-destructive mt-4" role="alert">
+          <span class="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </span>
+          <div>
+            <div class="alert-title">Error</div>
+            <div class="alert-desc" id="action-alert-msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data table -->
+      <div class="card">
+        <!-- List error -->
+        <div id="list-alert" class="alert alert-destructive" style="margin:1rem 1.5rem;border-radius:var(--radius)" role="alert">
+          <span class="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </span>
+          <div>
+            <div class="alert-title">Failed to load animals</div>
+            <div class="alert-desc" id="list-alert-msg"></div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="animals-table">
+            <thead>
+              <tr>
+                <th>Tag / RFID</th>
+                <th>Species</th>
+                <th>Breed</th>
+                <th>Sex</th>
+                <th>Age Class</th>
+                <th>Owner</th>
+                <th>Holding</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="animals-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="pagination-info" id="pagination-info">—</span>
+          <div class="pagination-btns">
+            <button class="btn btn-outline btn-sm" id="btn-prev"
+                    onclick="goPage(-1)" disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Previous
+            </button>
+            <button class="btn btn-outline btn-sm" id="btn-next"
+                    onclick="goPage(1)" disabled>
+              Next
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div><!-- /main-wrap -->
+</div><!-- /app -->
+
+
+<!-- ═══════════════════════════════════════════════════════
+     CREATE / EDIT MODAL
+═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="form-overlay" onclick="overlayClose(event, 'form-overlay')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-header">
+      <h2 id="modal-title">Register Animal</h2>
+      <button class="modal-close" onclick="closeModal('form-overlay')" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="animal-form" novalidate onsubmit="handleFormSubmit(event)">
+      <div class="modal-body">
+        <!-- Form error -->
+        <div id="form-alert" class="alert alert-destructive mb-4" role="alert">
+          <span class="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </span>
+          <div>
+            <div class="alert-title">Validation error</div>
+            <div class="alert-desc" id="form-alert-msg"></div>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <!-- Tag number -->
+          <div class="form-group">
+            <label for="f-tag">Tag Number *</label>
+            <input id="f-tag" name="tag_number" class="form-control" placeholder="KE-001234" required />
+            <span class="field-error" id="err-tag"></span>
+          </div>
+          <!-- RFID -->
+          <div class="form-group">
+            <label for="f-rfid">RFID Tag</label>
+            <input id="f-rfid" name="rfid_tag" class="form-control" placeholder="254000123456789" />
+            <span class="field-error" id="err-rfid"></span>
+          </div>
+          <!-- Species -->
+          <div class="form-group">
+            <label for="f-species">Species *</label>
+            <select id="f-species" name="species" class="form-control" required>
+              <option value="">Select species</option>
+              <option value="cattle">Cattle</option>
+              <option value="goat">Goat</option>
+              <option value="sheep">Sheep</option>
+              <option value="camel">Camel</option>
+              <option value="donkey">Donkey</option>
+            </select>
+            <span class="field-error" id="err-species"></span>
+          </div>
+          <!-- Breed -->
+          <div class="form-group">
+            <label for="f-breed">Breed *</label>
+            <input id="f-breed" name="breed" class="form-control" placeholder="e.g. Friesian" required />
+            <span class="field-error" id="err-breed"></span>
+          </div>
+          <!-- Sex -->
+          <div class="form-group">
+            <label for="f-sex">Sex *</label>
+            <select id="f-sex" name="sex" class="form-control" required>
+              <option value="">Select sex</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+            <span class="field-error" id="err-sex"></span>
+          </div>
+          <!-- Age class -->
+          <div class="form-group">
+            <label for="f-age-class">Age Class *</label>
+            <select id="f-age-class" name="age_class" class="form-control" required>
+              <option value="">Select age class</option>
+              <option value="calf">Calf</option>
+              <option value="weaner">Weaner</option>
+              <option value="yearling">Yearling</option>
+              <option value="adult">Adult</option>
+              <option value="senior">Senior</option>
+            </select>
+            <span class="field-error" id="err-age-class"></span>
+          </div>
+          <!-- Date of birth -->
+          <div class="form-group">
+            <label for="f-dob">Date of Birth</label>
+            <input id="f-dob" name="date_of_birth" type="date" class="form-control" />
+            <span class="field-error" id="err-dob"></span>
+          </div>
+          <!-- Color -->
+          <div class="form-group">
+            <label for="f-color">Color / Markings</label>
+            <input id="f-color" name="color" class="form-control" placeholder="e.g. Black and white" />
+            <span class="field-error" id="err-color"></span>
+          </div>
+          <!-- Weight -->
+          <div class="form-group">
+            <label for="f-weight">Weight (kg)</label>
+            <input id="f-weight" name="weight" type="number" step="0.1" min="0" class="form-control" placeholder="e.g. 380" />
+            <span class="field-error" id="err-weight"></span>
+          </div>
+          <!-- Status -->
+          <div class="form-group">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status" class="form-control">
+              <option value="alive">Active / Alive</option>
+              <option value="for_sale">For Sale</option>
+              <option value="sold">Sold</option>
+              <option value="slaughtered">Slaughtered</option>
+              <option value="deceased">Deceased</option>
+              <option value="quarantined">Quarantined</option>
+            </select>
+            <span class="field-error" id="err-status"></span>
+          </div>
+          <!-- Notes -->
+          <div class="form-group full">
+            <label for="f-notes">Distinguishing Marks / Notes</label>
+            <textarea id="f-notes" name="distinguishing_marks" class="form-control"
+                      placeholder="Any distinguishing marks or additional notes…"></textarea>
+            <span class="field-error" id="err-notes"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline btn-md" onclick="closeModal('form-overlay')">Cancel</button>
+        <button type="submit" id="form-submit-btn" class="btn btn-primary btn-md">
+          <span class="btn-label">Save Animal</span>
+          <span class="spinner" style="display:none"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     DETAIL PANEL
+═══════════════════════════════════════════════════════ -->
+<div class="detail-overlay" id="detail-overlay" onclick="overlayClose(event, 'detail-overlay')">
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-header">
+      <h2 id="detail-title">Animal Detail</h2>
+      <button class="modal-close" onclick="closeModal('detail-overlay')" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─── Constants ──────────────────────────────────────────────────── */
+const API_BASE    = '/api/v1';
+const PAGE_SIZE   = 10;
+
+/* ─── State ──────────────────────────────────────────────────────── */
+let state = {
+  animals:  [],
+  total:    0,
+  page:     1,
+  hasNext:  false,
+  hasPrev:  false,
+  loading:  false,
+  editingId: null,   // string | null — tag_number of animal being edited
+};
+
+let filterDebounce = null;
+
+/* ─── Auth helpers ───────────────────────────────────────────────── */
+function getToken()  { return localStorage.getItem('ct_access'); }
+function authHeaders() {
+  const t = getToken();
+  return t ? { 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/json' }
+           : { 'Content-Type': 'application/json' };
+}
+
+/* Try a silent token refresh if we get 401 ─────────────────────── */
+async function refreshToken() {
+  const refresh = localStorage.getItem('ct_refresh');
+  if (!refresh) return false;
+  try {
+    const res  = await fetch(`${API_BASE}/auth/token/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem('ct_access', data.access);
+    return true;
+  } catch { return false; }
+}
+
+async function apiFetch(url, options = {}) {
+  options.headers = { ...authHeaders(), ...(options.headers || {}) };
+  let res = await fetch(url, options);
+  if (res.status === 401) {
+    const ok = await refreshToken();
+    if (ok) {
+      options.headers = { ...authHeaders(), ...(options.headers || {}) };
+      res = await fetch(url, options);
+    }
+  }
+  return res;
+}
+
+/* ─── User info display ──────────────────────────────────────────── */
+function loadUserDisplay() {
+  try {
+    const u = JSON.parse(localStorage.getItem('ct_user') || '{}');
+    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || 'User';
+    document.getElementById('user-display-name').textContent = name;
+    document.getElementById('user-avatar-initials').textContent =
+      name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
+  } catch {}
+}
+
+/* ─── Status helpers ─────────────────────────────────────────────── */
+const STATUS_LABEL = {
+  alive: 'Active', for_sale: 'For Sale', sold: 'Sold',
+  slaughtered: 'Slaughtered', deceased: 'Deceased', quarantined: 'Quarantined',
+};
+const STATUS_BADGE = {
+  alive: 'badge-success', for_sale: 'badge-warning', sold: 'badge-info',
+  slaughtered: 'badge-danger', deceased: 'badge-danger', quarantined: 'badge-secondary',
+};
+function statusBadge(status) {
+  return `<span class="badge ${STATUS_BADGE[status] || 'badge-default'}">${STATUS_LABEL[status] || status}</span>`;
+}
+
+const SPECIES_LABEL = {
+  cattle: 'Cattle', goat: 'Goat', sheep: 'Sheep', camel: 'Camel', donkey: 'Donkey',
+};
+const AGE_CLASS_LABEL = {
+  calf: 'Calf', weaner: 'Weaner', yearling: 'Yearling', adult: 'Adult', senior: 'Senior',
+};
+const SEX_LABEL = { male: 'Male', female: 'Female' };
+
+/* ─── Fetch & render list ────────────────────────────────────────── */
+async function loadAnimals() {
+  if (state.loading) return;
+  state.loading = true;
+  renderTable();  // show skeleton
+
+  const search   = document.getElementById('search-input').value.trim();
+  const species  = document.getElementById('filter-species').value;
+  const status   = document.getElementById('filter-status').value;
+  const ordering = document.getElementById('filter-ordering').value;
+
+  const params = new URLSearchParams({
+    page:      state.page,
+    page_size: PAGE_SIZE,
+    ordering,
+  });
+  if (search)  params.set('search',  search);
+  if (species) params.set('species', species);
+  if (status)  params.set('status',  status);
+
+  try {
+    const res  = await apiFetch(`${API_BASE}/animals/?${params}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to load');
+
+    // Handle paginated or plain array response
+    const results = Array.isArray(data) ? data : (data.results || []);
+    const total   = Array.isArray(data) ? data.length : (data.count || 0);
+
+    state.animals = results;
+    state.total   = total;
+    state.hasNext = !Array.isArray(data) && Boolean(data.next);
+    state.hasPrev = !Array.isArray(data) && Boolean(data.previous);
+
+    hideAlert('list-alert');
+    renderStats(results, total);
+  } catch (e) {
+    state.animals = [];
+    state.total   = 0;
+    state.hasNext = false;
+    state.hasPrev = false;
+    showAlert('list-alert', 'list-alert-msg', e.message || 'Unable to load animals.');
+  } finally {
+    state.loading = false;
+    renderTable();
+    renderPagination();
+  }
+}
+
+/* ─── Render stats ───────────────────────────────────────────────── */
+function renderStats(results, total) {
+  document.getElementById('stat-total').textContent   = total.toLocaleString();
+  const alive   = results.filter(a => a.status === 'alive').length;
+  const forsale = results.filter(a => a.status === 'for_sale').length;
+  const sold    = results.filter(a => a.status === 'sold').length;
+  document.getElementById('stat-active').textContent  = alive;
+  document.getElementById('stat-forsale').textContent = forsale;
+  document.getElementById('stat-sold').textContent    = sold;
+}
+
+/* ─── Render table ───────────────────────────────────────────────── */
+function renderTable() {
+  const tbody = document.getElementById('animals-tbody');
+
+  if (state.loading) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="table-msg">
+          <div style="display:flex;align-items:center;justify-content:center;gap:.625rem">
+            <div class="spinner spinner-dark"></div>
+            Loading animals…
+          </div>
+        </td>
+      </tr>`;
+    return;
+  }
+
+  if (state.animals.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="table-msg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          No animals found. Try adjusting your search or filters.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  tbody.innerHTML = state.animals.map(a => `
+    <tr>
+      <td class="td-mono">${esc(a.tag_number || '—')}</td>
+      <td>${esc(SPECIES_LABEL[a.species] || a.species || '—')}</td>
+      <td>${esc(a.breed || '—')}</td>
+      <td>${esc(SEX_LABEL[a.sex] || a.sex || '—')}</td>
+      <td>${esc(AGE_CLASS_LABEL[a.age_class] || a.age_class || '—')}</td>
+      <td>${esc(ownerName(a))}</td>
+      <td>${esc(holdingName(a))}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td>
+        <div class="actions-cell">
+          <button class="btn-icon" title="View details"
+                  onclick="openDetail(${JSON.stringify(a).split('"').join('&quot;')})">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn-icon" title="Edit"
+                  onclick="openEditModal('${esc(a.tag_number)}')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" title="Delete"
+                  onclick="handleDelete('${esc(a.tag_number)}', '${esc(a.rfid_tag || a.tag_number)}')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function esc(str) {
+  if (str == null) return '—';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function ownerName(a) {
+  if (a.current_owner_name) return a.current_owner_name;
+  if (a.owner)              return 'Owner #' + a.owner;
+  return '—';
+}
+function holdingName(a) {
+  if (a.current_holding_name) return a.current_holding_name;
+  if (a.current_holding)      return 'Holding #' + a.current_holding;
+  return '—';
+}
+
+/* ─── Render pagination ──────────────────────────────────────────── */
+function renderPagination() {
+  const shown = state.animals.length;
+  const from  = shown > 0 ? (state.page - 1) * PAGE_SIZE + 1 : 0;
+  const to    = from + shown - 1;
+  document.getElementById('pagination-info').textContent =
+    state.total > 0
+      ? `Showing ${from}–${to} of ${state.total.toLocaleString()} animals`
+      : 'No animals';
+  document.getElementById('btn-prev').disabled = state.loading || !state.hasPrev;
+  document.getElementById('btn-next').disabled = state.loading || !state.hasNext;
+}
+
+function goPage(dir) {
+  state.page = Math.max(1, state.page + dir);
+  loadAnimals();
+}
+
+/* ─── Filter change (debounced for search) ───────────────────────── */
+function onFilterChange() {
+  clearTimeout(filterDebounce);
+  state.page = 1;
+  filterDebounce = setTimeout(loadAnimals, 350);
+}
+
+/* ─── Alert helpers ──────────────────────────────────────────────── */
+function showAlert(alertId, msgId, msg) {
+  const el = document.getElementById(alertId);
+  document.getElementById(msgId).textContent = msg;
+  el.classList.add('visible');
+}
+function hideAlert(alertId) {
+  document.getElementById(alertId).classList.remove('visible');
+}
+
+/* ─── Field error helpers ────────────────────────────────────────── */
+function setFieldError(inputId, errorId, msg) {
+  const inp = document.getElementById(inputId);
+  const err = document.getElementById(errorId);
+  if (inp) inp.classList.add('is-error');
+  if (err) { err.textContent = msg; err.classList.add('visible'); }
+}
+function clearFormErrors() {
+  document.querySelectorAll('#animal-form .form-control').forEach(el => el.classList.remove('is-error'));
+  document.querySelectorAll('#animal-form .field-error').forEach(el => { el.textContent = ''; el.classList.remove('visible'); });
+  hideAlert('form-alert');
+}
+
+/* ─── Modal open/close ───────────────────────────────────────────── */
+function openModal(overlayId) {
+  document.getElementById(overlayId).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(overlayId) {
+  document.getElementById(overlayId).classList.remove('open');
+  document.body.style.overflow = '';
+}
+function overlayClose(e, overlayId) {
+  if (e.target === document.getElementById(overlayId)) closeModal(overlayId);
+}
+
+/* ─── Create modal ───────────────────────────────────────────────── */
+function openCreateModal() {
+  state.editingId = null;
+  document.getElementById('modal-title').textContent = 'Register New Animal';
+  document.getElementById('form-submit-btn').querySelector('.btn-label').textContent = 'Register Animal';
+  document.getElementById('animal-form').reset();
+  clearFormErrors();
+  openModal('form-overlay');
+}
+
+/* ─── Edit modal ─────────────────────────────────────────────────── */
+async function openEditModal(tagNumber) {
+  state.editingId = tagNumber;
+  document.getElementById('modal-title').textContent = 'Edit Animal';
+  document.getElementById('form-submit-btn').querySelector('.btn-label').textContent = 'Save Changes';
+  document.getElementById('animal-form').reset();
+  clearFormErrors();
+
+  // Fetch the single animal to pre-fill form
+  try {
+    const res  = await apiFetch(`${API_BASE}/animals/${tagNumber}/`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Not found');
+    prefillForm(data);
+    openModal('form-overlay');
+  } catch(e) {
+    showAlert('action-alert', 'action-alert-msg', 'Unable to load animal: ' + e.message);
+  }
+}
+
+function prefillForm(a) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+  set('f-tag',       a.tag_number);
+  set('f-rfid',      a.rfid_tag);
+  set('f-species',   a.species);
+  set('f-breed',     a.breed);
+  set('f-sex',       a.sex);
+  set('f-age-class', a.age_class);
+  set('f-dob',       a.date_of_birth ? a.date_of_birth.slice(0, 10) : '');
+  set('f-color',     a.color);
+  set('f-weight',    a.weight);
+  set('f-status',    a.status);
+  set('f-notes',     a.distinguishing_marks);
+}
+
+/* ─── Form submit (create + edit) ───────────────────────────────── */
+async function handleFormSubmit(e) {
+  e.preventDefault();
+  clearFormErrors();
+  hideAlert('action-alert');
+
+  const payload = {
+    tag_number:          document.getElementById('f-tag').value.trim(),
+    rfid_tag:            document.getElementById('f-rfid').value.trim() || null,
+    species:             document.getElementById('f-species').value,
+    breed:               document.getElementById('f-breed').value.trim(),
+    sex:                 document.getElementById('f-sex').value,
+    age_class:           document.getElementById('f-age-class').value,
+    date_of_birth:       document.getElementById('f-dob').value || null,
+    color:               document.getElementById('f-color').value.trim() || null,
+    weight:              document.getElementById('f-weight').value ? parseFloat(document.getElementById('f-weight').value) : null,
+    status:              document.getElementById('f-status').value,
+    distinguishing_marks: document.getElementById('f-notes').value.trim() || null,
+  };
+
+  // Client-side required check
+  let hasError = false;
+  if (!payload.tag_number) { setFieldError('f-tag',     'err-tag',     'Tag number is required.'); hasError = true; }
+  if (!payload.species)    { setFieldError('f-species', 'err-species', 'Species is required.');    hasError = true; }
+  if (!payload.breed)      { setFieldError('f-breed',   'err-breed',   'Breed is required.');      hasError = true; }
+  if (!payload.sex)        { setFieldError('f-sex',     'err-sex',     'Sex is required.');         hasError = true; }
+  if (!payload.age_class)  { setFieldError('f-age-class','err-age-class','Age class is required.'); hasError = true; }
+  if (hasError) return;
+
+  const btn     = document.getElementById('form-submit-btn');
+  const label   = btn.querySelector('.btn-label');
+  const spinner = btn.querySelector('.spinner');
+  btn.disabled = true;
+  label.style.display   = 'none';
+  spinner.style.display = '';
+
+  try {
+    const isEdit = Boolean(state.editingId);
+    const url    = isEdit ? `${API_BASE}/animals/${state.editingId}/` : `${API_BASE}/animals/`;
+    const method = isEdit ? 'PATCH' : 'POST';
+
+    const res  = await apiFetch(url, { method, body: JSON.stringify(payload) });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const global = data.detail || data.non_field_errors?.[0] || null;
+      showAlert('form-alert', 'form-alert-msg', global || 'Please correct the highlighted errors.');
+      // Map DRF field errors
+      const fieldMap = {
+        tag_number: ['f-tag',      'err-tag'],
+        rfid_tag:   ['f-rfid',     'err-rfid'],
+        species:    ['f-species',  'err-species'],
+        breed:      ['f-breed',    'err-breed'],
+        sex:        ['f-sex',      'err-sex'],
+        age_class:  ['f-age-class','err-age-class'],
+        color:      ['f-color',    'err-color'],
+        weight:     ['f-weight',   'err-weight'],
+        status:     ['f-status',   'err-status'],
+      };
+      Object.entries(fieldMap).forEach(([key, [inp, err]]) => {
+        if (data[key]) setFieldError(inp, err, Array.isArray(data[key]) ? data[key][0] : data[key]);
+      });
+      return;
+    }
+
+    closeModal('form-overlay');
+    await loadAnimals();
+
+  } catch(err) {
+    showAlert('form-alert', 'form-alert-msg', 'Network error. Please try again.');
+  } finally {
+    btn.disabled = false;
+    label.style.display   = '';
+    spinner.style.display = 'none';
+  }
+}
+
+/* ─── Delete ─────────────────────────────────────────────────────── */
+async function handleDelete(tagNumber, displayId) {
+  const ok = window.confirm(
+    `Delete animal "${displayId}"?\nThis action cannot be undone.`
+  );
+  if (!ok) return;
+
+  hideAlert('action-alert');
+  try {
+    const res = await apiFetch(`${API_BASE}/animals/${tagNumber}/`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 204) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || 'Delete failed');
+    }
+    await loadAnimals();
+  } catch(e) {
+    showAlert('action-alert', 'action-alert-msg', e.message || 'Unable to delete animal.');
+  }
+}
+
+/* ─── Detail panel ───────────────────────────────────────────────── */
+function openDetail(animal) {
+  // animal may be a pre-parsed object passed from onclick
+  const a = typeof animal === 'string' ? JSON.parse(animal) : animal;
+  document.getElementById('detail-title').textContent = a.tag_number || 'Animal Detail';
+
+  const fmt = v => v != null ? v : '—';
+  const fmtDate = v => v ? new Date(v).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—';
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-icon-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 7.65l1.06 1.06L12 21.23l7.77-7.94 1.06-1.06a5.4 5.4 0 0 0-.41-7.65z"/>
+      </svg>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Tag Number</div>
+      <div class="detail-value font-mono">${fmt(a.tag_number)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">RFID Tag</div>
+      <div class="detail-value font-mono">${fmt(a.rfid_tag)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Status</div>
+      <div>${statusBadge(a.status)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Species</div>
+      <div class="detail-value">${fmt(SPECIES_LABEL[a.species] || a.species)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Breed</div>
+      <div class="detail-value">${fmt(a.breed)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Sex</div>
+      <div class="detail-value">${fmt(SEX_LABEL[a.sex] || a.sex)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Age Class</div>
+      <div class="detail-value">${fmt(AGE_CLASS_LABEL[a.age_class] || a.age_class)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Date of Birth</div>
+      <div class="detail-value">${fmtDate(a.date_of_birth)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Color / Markings</div>
+      <div class="detail-value">${fmt(a.color)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Weight</div>
+      <div class="detail-value">${a.weight != null ? a.weight + ' kg' : '—'}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Current Owner</div>
+      <div class="detail-value">${ownerName(a)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Current Holding</div>
+      <div class="detail-value">${holdingName(a)}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Registration Date</div>
+      <div class="detail-value">${fmtDate(a.registration_date)}</div>
+    </div>
+    ${a.distinguishing_marks ? `
+    <div class="detail-row">
+      <div class="detail-label">Notes</div>
+      <div class="detail-value">${esc(a.distinguishing_marks)}</div>
+    </div>` : ''}
+    <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+      <button class="btn btn-outline btn-md" style="flex:1"
+              onclick="closeModal('detail-overlay'); openEditModal('${esc(a.tag_number)}')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:1rem;height:1rem"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit
+      </button>
+    </div>
+  `;
+
+  document.getElementById('detail-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+/* Detail panel close on overlay click */
+document.getElementById('detail-overlay').addEventListener('click', function(e) {
+  if (e.target === this) { closeModal('detail-overlay'); }
+});
+
+/* ─── Init ───────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  loadUserDisplay();
+  loadAnimals();
+});
+</script>
+</body>
+</html>

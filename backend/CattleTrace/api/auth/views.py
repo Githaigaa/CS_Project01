@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import random
+import string
+
+from django.core.mail import send_mail
+from django.core import signing
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,10 +23,13 @@ from CattleTrace.api.auth.serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
     NotificationPreferencesSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetVerifyOtpSerializer,
     RegisterSerializer,
     UserProfileUpdateSerializer,
 )
-from CattleTrace.models import default_notification_preferences
+from CattleTrace.models import User, default_notification_preferences
 
 
 class RegisterView(generics.CreateAPIView):
@@ -97,6 +107,109 @@ class PreferencesView(generics.RetrieveUpdateAPIView):
             AuthenticatedUserSerializer(instance, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
+
+
+OTP_EXPIRY_MINUTES = 15
+
+
+def _generate_otp() -> str:
+    return "".join(random.choices(string.digits, k=6))
+
+
+def _hash_otp(otp: str) -> str:
+    return hashlib.sha256(otp.encode()).hexdigest()
+
+
+class PasswordResetRequestView(generics.GenericAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = PasswordResetRequestSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            return Response({"detail": "If that email is registered, a 6-digit code has been sent."})
+
+        otp = _generate_otp()
+        user.password_reset_otp = _hash_otp(otp)
+        user.password_reset_otp_expires = timezone.now() + timezone.timedelta(minutes=OTP_EXPIRY_MINUTES)
+        user.save(update_fields=["password_reset_otp", "password_reset_otp_expires"])
+
+        send_mail(
+            subject="CattleTrace — Your Password Reset Code",
+            message=(
+                f"Hi {user.username},\n\n"
+                f"Your password reset code is:\n\n"
+                f"  {otp}\n\n"
+                f"This code expires in {OTP_EXPIRY_MINUTES} minutes. "
+                f"If you didn't request this, you can ignore this email."
+            ),
+            from_email=None,
+            recipient_list=[user.email],
+        )
+
+        return Response({"detail": "If that email is registered, a 6-digit code has been sent."})
+
+
+class PasswordResetVerifyOtpView(generics.GenericAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = PasswordResetVerifyOtpSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        otp = serializer.validated_data["otp"]
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            return Response({"detail": "Invalid code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.password_reset_otp or not user.password_reset_otp_expires:
+            return Response({"detail": "Invalid code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if timezone.now() > user.password_reset_otp_expires:
+            return Response({"detail": "Code has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if _hash_otp(otp) != user.password_reset_otp:
+            return Response({"detail": "Invalid code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # OTP verified — issue a short-lived signed reset token (10 min)
+        reset_token = signing.dumps({"uid": user.pk}, salt="password-reset")
+        return Response({"reset_token": reset_token})
+
+
+class PasswordResetConfirmView(generics.GenericAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = PasswordResetConfirmSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            data = signing.loads(
+                serializer.validated_data["reset_token"],
+                salt="password-reset",
+                max_age=600,  # 10 minutes
+            )
+            user = User.objects.get(pk=data["uid"])
+        except (signing.BadSignature, signing.SignatureExpired, User.DoesNotExist, KeyError):
+            return Response(
+                {"detail": "Invalid or expired session. Please start over."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(serializer.validated_data["new_password"])
+        user.password_reset_otp = ""
+        user.password_reset_otp_expires = None
+        user.save(update_fields=["password", "password_reset_otp", "password_reset_otp_expires"])
+        return Response({"detail": "Password has been reset successfully."})
 
 
 class ChangePasswordView(generics.GenericAPIView):

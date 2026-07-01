@@ -42,6 +42,8 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         FARMER = "farmer", "Farmer"
         VET = "vet", "Veterinarian"
+        CAHW = "cahw", "Community Animal Health Worker"
+        DVS = "dvs", "County DVS Officer"
         INSPECTOR = "inspector", "Inspector"
         BUYER = "buyer", "Buyer"
         ABATTOIR = "abattoir", "Abattoir"
@@ -55,8 +57,16 @@ class User(AbstractUser):
     location = models.CharField(max_length=255, blank=True)
     notification_preferences = models.JSONField(default=default_notification_preferences, blank=True)
     is_verified = models.BooleanField(default=False)
+    # DVS / CAHW specific
+    county_zone = models.CharField(max_length=100, blank=True, help_text="Assigned county for DVS officers and vets")
+    dvs_number = models.CharField(max_length=50, blank=True, help_text="DVS registration number")
+    is_cahw_verified = models.BooleanField(default=False, help_text="CAHW verified by county DVS officer")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # OTP-based password reset
+    password_reset_otp = models.CharField(max_length=64, blank=True)
+    password_reset_otp_expires = models.DateTimeField(null=True, blank=True)
 
     # Override AbstractUser fields to avoid reverse accessor clashes with auth.User
     groups = models.ManyToManyField(
@@ -88,6 +98,14 @@ class Farm(models.Model):
     gps_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     gps_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     total_area_acres = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    # Movement restrictions placed by DVS officer
+    is_restricted = models.BooleanField(default=False)
+    restriction_reason = models.TextField(blank=True)
+    restricted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="restricted_farms"
+    )
+    restricted_on = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -115,6 +133,7 @@ class Animal(models.Model):
 
     class Status(models.TextChoices):
         ALIVE = "alive", "Alive"
+        STOLEN = "stolen", "Stolen"
         SOLD = "sold", "Sold"
         SLAUGHTERED = "slaughtered", "Slaughtered"
         DECEASED = "deceased", "Deceased"
@@ -167,6 +186,22 @@ class Animal(models.Model):
         return delta.days // 30
 
 
+class AnimalPhoto(models.Model):
+    """Up to 5 photos per animal — either an uploaded file or a URL."""
+
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to="animals/photos/", blank=True, null=True)
+    url = models.URLField(max_length=2000, blank=True)
+    order = models.PositiveSmallIntegerField(default=0)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "uploaded_at"]
+
+    def __str__(self):
+        return f"Photo {self.order} for {self.animal.tag_number}"
+
+
 class AnimalWeight(models.Model):
     """Weight measurements over time."""
 
@@ -217,12 +252,28 @@ class HealthRecord(models.Model):
         DIPPING = "dipping", "Dipping"
         OTHER = "other", "Other"
 
+    class CredibilityLevel(models.TextChoices):
+        VET_VERIFIED = "vet_verified", "Vet Verified"
+        CAHW_OBSERVATION = "cahw_observation", "CAHW Observation"
+        SELF_REPORTED = "self_reported", "Self Reported"
+
     animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name="health_records")
     record_type = models.CharField(max_length=20, choices=RecordType.choices)
     date = models.DateField(default=timezone.now)
     vet = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True,
-        limit_choices_to={"role": User.Role.VET}
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        limit_choices_to={"role__in": ["vet", "cahw"]},
+        related_name="health_records_recorded"
+    )
+    credibility_level = models.CharField(
+        max_length=20, choices=CredibilityLevel.choices,
+        default=CredibilityLevel.SELF_REPORTED
+    )
+    is_escalated = models.BooleanField(default=False)
+    escalated_to = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        limit_choices_to={"role": "dvs"},
+        related_name="escalated_health_records"
     )
     diagnosis = models.ForeignKey(Disease, on_delete=models.SET_NULL, null=True, blank=True)
     vaccine_used = models.ForeignKey(Vaccine, on_delete=models.SET_NULL, null=True, blank=True)
@@ -256,8 +307,8 @@ class MovementPermit(models.Model):
 
     permit_number = models.CharField(max_length=100, unique=True)
     issued_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True,
-        limit_choices_to={"role": User.Role.INSPECTOR},
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        limit_choices_to={"role__in": ["inspector", "dvs", "admin"]},
         related_name="permits_issued"
     )
     issued_on = models.DateField(default=timezone.now)
@@ -337,6 +388,7 @@ class SlaughterRecord(models.Model):
     abattoir = models.ForeignKey(Abattoir, on_delete=models.SET_NULL, null=True)
     slaughter_date = models.DateField()
     slaughter_no = models.CharField(max_length=100, unique=True)
+    batch_number = models.CharField(max_length=100, blank=True, help_text="Groups animals slaughtered on the same day")
 
     # Carcass data
     live_weight_kg = models.DecimalField(max_digits=7, decimal_places=2)
@@ -366,8 +418,13 @@ class SlaughterRecord(models.Model):
         return None
 
     def save(self, *args, **kwargs):
+        blocked = {Animal.Status.STOLEN, Animal.Status.DECEASED, Animal.Status.SLAUGHTERED}
+        if self._state.adding and self.animal.status in blocked:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(
+                f"Cannot slaughter an animal with status '{self.animal.get_status_display()}'."
+            )
         super().save(*args, **kwargs)
-        # Update animal status automatically
         self.animal.status = Animal.Status.SLAUGHTERED
         self.animal.save(update_fields=["status"])
 

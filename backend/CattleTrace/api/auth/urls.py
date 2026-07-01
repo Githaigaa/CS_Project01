@@ -8,6 +8,9 @@ from CattleTrace.api.auth.views import (
     ChangePasswordView,
     CustomTokenObtainPairView,
     MeView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    PasswordResetVerifyOtpView,
     PreferencesView,
     RegisterView,
 )
@@ -20,4 +23,7 @@ urlpatterns = [
     path("me/avatar/", AvatarUploadView.as_view(), name="me_avatar"),
     path("me/preferences/", PreferencesView.as_view(), name="me_preferences"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
+    path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
+    path("password-reset/verify-otp/", PasswordResetVerifyOtpView.as_view(), name="password_reset_verify_otp"),
+    path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
 ]

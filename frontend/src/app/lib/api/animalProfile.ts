@@ -108,30 +108,36 @@ export function normalizeListResponse<T>(
 // Mapper: ApiHealthRecord → HealthEvent (UI type)
 // ─────────────────────────────────────────────
 
-const RECORD_TYPE_LABEL: Record<string, HealthEvent["eventType"]> = {
-  vaccination: "Vaccination",
-  treatment: "Treatment",
-  examination: "Treatment",
-  deworming: "Treatment",
-  dipping: "Treatment",
-  other: "Treatment",
-};
+// NOTE: eventType/severity logic must stay identical to
+// `mapApiHealthRecordToHealthEvent` in `./health.ts` — both mappers render the
+// *same* HealthRecord rows (Health Records screen vs. Animal Profile health
+// tab) and previously disagreed on classification, causing the same record to
+// show as "Disease" in one screen and "Treatment" in the other.
+function getEventType(r: ApiHealthRecord): HealthEvent["eventType"] {
+  if (r.record_type === "vaccination") return "Vaccination";
+  if (r.diagnosis_detail) return "Disease";
+  return "Treatment";
+}
 
 export function mapApiHealthRecord(r: ApiHealthRecord): HealthEvent {
+  const eventType = getEventType(r);
+  const disease = r.diagnosis_detail?.name || (eventType === "Disease" ? r.medication : undefined);
+  const vaccine = r.vaccine_used_detail?.name || (eventType === "Vaccination" ? r.medication : undefined);
+
   return {
     id: String(r.id),
     animalId: String(r.animal),
     animalRfid: r.animal_tag,
-    eventType: RECORD_TYPE_LABEL[r.record_type] ?? "Treatment",
-    disease: r.diagnosis_detail?.name || undefined,
-    vaccine: r.vaccine_used_detail?.name || undefined,
+    eventType,
+    disease,
+    vaccine,
     date: r.date,
     recordedBy: r.vet ? `Vet #${r.vet}` : "Unknown",
-    credentialLevel: "Licensed Veterinary Officer",
+    credentialLevel: r.vet ? "Licensed Veterinary Officer" : "Authorized record",
     notes: r.notes || undefined,
-    // Severity is not stored on HealthRecord; default to Low unless it's a
-    // notifiable disease.
-    severity: r.diagnosis_detail?.is_notifiable ? "High" : "Low",
+    // Kept in sync with health.ts: severity is derived from eventType, not
+    // from disease.is_notifiable, since HealthRecord stores no severity field.
+    severity: eventType === "Disease" ? "Medium" : "Low",
   };
 }
 

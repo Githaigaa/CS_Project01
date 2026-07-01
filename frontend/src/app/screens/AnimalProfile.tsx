@@ -192,12 +192,16 @@ export function AnimalProfile({ animalId, onBack }: AnimalProfileProps) {
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-4">
-              <img
-                src={animal.photo}
-                alt={animal.breed}
-                className="w-full h-full object-cover"
-              />
+            <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-4 flex items-center justify-center">
+              {animal.photo ? (
+                <img
+                  src={animal.photo}
+                  alt={animal.breed}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-muted-foreground text-sm text-center p-4">No photo</div>
+              )}
             </div>
             <div className="space-y-2">
               <div>

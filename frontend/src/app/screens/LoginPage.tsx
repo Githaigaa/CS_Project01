@@ -90,6 +90,16 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
               disabled={isSubmitting}
               error={fieldErrors.password}
             />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="text-sm text-primary hover:underline"
+                onClick={() => onNavigate("forgot-password")}
+                disabled={isSubmitting}
+              >
+                Forgot password?
+              </button>
+            </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>

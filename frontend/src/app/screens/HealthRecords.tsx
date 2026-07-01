@@ -1,4 +1,4 @@
-import { Plus, Heart, AlertTriangle, Syringe, Activity } from "lucide-react";
+import { Plus, Heart, AlertTriangle, Syringe, Activity, ArrowUpCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
 import { Button } from "../components/Button";
@@ -11,6 +11,7 @@ import { formatDate } from "../lib/utils";
 import { animalsApi } from "../services/api/animals";
 import { getApiErrorMessage } from "../services/api/errors";
 import { healthApi } from "../services/api/health";
+import { apiClient } from "../services/api/client";
 
 type FormState = {
   animalTag: string;
@@ -76,6 +77,7 @@ export function HealthRecords() {
   const [selectedRecord, setSelectedRecord] = useState<ApiHealthRecord | null>(null);
   const [editingRecordId, setEditingRecordId] = useState<number | null>(null);
   const [deletingRecordId, setDeletingRecordId] = useState<number | null>(null);
+  const [escalatingRecordId, setEscalatingRecordId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [nextPageAvailable, setNextPageAvailable] = useState(false);
@@ -266,6 +268,32 @@ export function HealthRecords() {
     } finally {
       setDeletingRecordId(null);
     }
+  };
+
+  const handleEscalate = async (recordId: number) => {
+    setEscalatingRecordId(recordId);
+    setActionError(null);
+    try {
+      const { data } = await apiClient.post(`/health-events/${recordId}/escalate/`);
+      alert(data.detail ?? "Record escalated to DVS officer.");
+      await refreshCurrentPage();
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, "Failed to escalate record."));
+    } finally {
+      setEscalatingRecordId(null);
+    }
+  };
+
+  const credibilityBadgeVariant = (level: string) => {
+    if (level === "vet_verified") return "success" as const;
+    if (level === "cahw_observation") return "warning" as const;
+    return "secondary" as const;
+  };
+
+  const credibilityLabel = (level: string) => {
+    if (level === "vet_verified") return "Vet Verified";
+    if (level === "cahw_observation") return "CAHW";
+    return "Self Reported";
   };
 
   const selectedEvent = selectedRecord ? mapApiHealthRecordToHealthEvent(selectedRecord) : null;
@@ -548,14 +576,15 @@ export function HealthRecords() {
                           RFID: {event.animalRfid}
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Badge variant={
-                          event.severity === "Low" ? "success" :
-                          event.severity === "Medium" ? "warning" :
-                          "danger"
-                        }>
-                          {event.severity}
-                        </Badge>
+                      <div className="space-y-2 flex flex-col items-end">
+                        <div className="flex gap-2">
+                          <Badge variant={credibilityBadgeVariant(record.credibility_level)}>
+                            {credibilityLabel(record.credibility_level)}
+                          </Badge>
+                          {record.is_escalated && (
+                            <Badge variant="warning">Escalated</Badge>
+                          )}
+                        </div>
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleViewRecord(record.id)}>
                             View
@@ -563,6 +592,18 @@ export function HealthRecords() {
                           <Button variant="outline" size="sm" onClick={() => handleEditRecord(record.id)}>
                             Edit
                           </Button>
+                          {!record.is_escalated && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={escalatingRecordId === record.id}
+                              onClick={() => handleEscalate(record.id)}
+                              title="Escalate to DVS Officer"
+                            >
+                              <ArrowUpCircle className="w-4 h-4" />
+                              Escalate
+                            </Button>
+                          )}
                           <Button
                             variant="danger"
                             size="sm"

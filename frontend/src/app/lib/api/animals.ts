@@ -30,7 +30,9 @@ export interface ApiAnimal {
   color: string;
   markings: string;
   current_owner: number | null;
+  current_owner_name: string | null;
   current_farm: number | null;
+  current_farm_name: string | null;
   dam: number | null;
   sire: number | null;
   status: ApiAnimalStatus;
@@ -80,14 +82,14 @@ export function mapApiAnimalToAnimal(apiAnimal: ApiAnimal): Animal {
     id: apiAnimal.tag_number,
     rfid: apiAnimal.rfid_tag || apiAnimal.tag_number,
     species: "Cattle",
-    breed: apiAnimal.breed_detail?.name || "Unspecified",
+    breed: apiAnimal.breed_detail?.name || apiAnimal.name || "Unspecified",
     sex: apiAnimal.sex === "M" ? "Male" : "Female",
     ageClass,
     dateOfBirth: apiAnimal.date_of_birth,
     color: apiAnimal.color || undefined,
     distinguishingMarks: apiAnimal.markings || undefined,
-    currentOwner: apiAnimal.current_owner ? `Owner #${apiAnimal.current_owner}` : "Unassigned",
-    currentHolding: apiAnimal.current_farm ? `Holding #${apiAnimal.current_farm}` : "Unassigned",
+    currentOwner: apiAnimal.current_owner_name || (apiAnimal.current_owner ? `Owner #${apiAnimal.current_owner}` : "Unassigned"),
+    currentHolding: apiAnimal.current_farm_name || (apiAnimal.current_farm ? `Holding #${apiAnimal.current_farm}` : "Unassigned"),
     status: animalStatusLabels[apiAnimal.status],
     registrationDate: apiAnimal.registration_date,
     photo: apiAnimal.photo || undefined,

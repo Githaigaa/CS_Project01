@@ -11,6 +11,7 @@
 export interface ApiFarm {
   id: number;
   owner: number | null;
+  owner_name: string | null;
   name: string;
   registration_no: string;
   county: string;
@@ -88,7 +89,7 @@ export function mapApiFarmToHolding(f: ApiFarm): UiHolding {
     id: f.id,
     name: f.name,
     registrationNo: f.registration_no,
-    owner: f.owner ? `Owner #${f.owner}` : "Unassigned",
+    owner: f.owner_name || (f.owner ? `Owner #${f.owner}` : "Unassigned"),
     county: f.county,
     subCounty: f.sub_county,
     ward: f.ward,

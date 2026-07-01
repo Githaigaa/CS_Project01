@@ -62,7 +62,11 @@ async function getHealthAlerts(): Promise<number> {
 }
 
 async function getPendingPermits(): Promise<number> {
-  return fetchCount("/movement-permits/");
+  // Must filter by status — the backend's default (non-staff) queryset
+  // returns only APPROVED permits, and the unfiltered count for staff
+  // includes every status. Without this filter the "Pending Permits" stat
+  // card was actually showing approved (or total) permits, not pending ones.
+  return fetchCount("/movement-permits/", { status: "pending" });
 }
 
 async function getRecentTransactionCount(): Promise<number> {

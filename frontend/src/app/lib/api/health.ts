@@ -30,6 +30,10 @@ export interface ApiHealthRecord {
   record_type: ApiHealthRecordType;
   date: string;
   vet: number | null;
+  vet_name: string | null;
+  credibility_level: "vet_verified" | "cahw_observation" | "self_reported";
+  credibility_level_display: string;
+  is_escalated: boolean;
   diagnosis: number | null;
   diagnosis_detail: ApiDisease | null;
   vaccine_used: number | null;
@@ -88,8 +92,8 @@ export function mapApiHealthRecordToHealthEvent(record: ApiHealthRecord): Health
     disease,
     vaccine,
     date: record.date,
-    recordedBy: record.vet ? `Vet #${record.vet}` : "CattleTrace",
-    credentialLevel: record.vet ? "Veterinary record" : "Authorized record",
+    recordedBy: record.vet_name || (record.vet ? `Vet #${record.vet}` : "CattleTrace"),
+    credentialLevel: record.credibility_level_display || (record.vet ? "Veterinary record" : "Authorized record"),
     notes: record.notes || undefined,
     severity: eventType === "Disease" ? "Medium" : "Low",
   };

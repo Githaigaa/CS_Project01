@@ -23,7 +23,7 @@ class MovementPermitSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        if user.role in (user.Role.INSPECTOR, user.Role.ADMIN):
+        if user.role in (user.Role.INSPECTOR, user.Role.DVS, user.Role.ADMIN):
             validated_data['issued_by'] = user
         return super().create(validated_data)
 

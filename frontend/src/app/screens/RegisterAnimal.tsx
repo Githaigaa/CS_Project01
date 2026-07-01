@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, Link, Upload, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
 import { Button } from "../components/Button";
 import { Input, Select, Textarea } from "../components/Input";
 import { animalsApi } from "../services/api/animals";
+import { holdingsApi } from "../services/api/holdings";
+import type { ApiFarm } from "../lib/api/holdings";
 import { getApiErrorMessage } from "../services/api/errors";
 
 interface RegisterAnimalProps {
@@ -15,6 +17,59 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [farms, setFarms] = useState<ApiFarm[]>([]);
+
+  useEffect(() => {
+    holdingsApi.listHoldings({ pageSize: 100 }).then((res) => setFarms(res.results)).catch(() => {});
+  }, []);
+
+  // Photo state
+  type PhotoEntry = { kind: "file"; file: File; preview: string } | { kind: "url"; url: string };
+  const [photos, setPhotos] = useState<PhotoEntry[]>([]);
+  const [photoTab, setPhotoTab] = useState<"file" | "url">("file");
+  const [urlInput, setUrlInput] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_PHOTOS = 5;
+
+  const addFiles = (files: FileList | null) => {
+    if (!files) return;
+    const remaining = MAX_PHOTOS - photos.length;
+    const accepted = Array.from(files).slice(0, remaining).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    const entries: PhotoEntry[] = accepted.map((file) => ({
+      kind: "file",
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setPhotos((prev) => [...prev, ...entries]);
+  };
+
+  const addUrl = () => {
+    setUrlError(null);
+    try { new URL(urlInput); } catch {
+      setUrlError("Enter a valid URL.");
+      return;
+    }
+    if (photos.length >= MAX_PHOTOS) {
+      setUrlError(`Maximum ${MAX_PHOTOS} photos allowed.`);
+      return;
+    }
+    setPhotos((prev) => [...prev, { kind: "url", url: urlInput }]);
+    setUrlInput("");
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => {
+      const entry = prev[index];
+      if (entry.kind === "file") URL.revokeObjectURL(entry.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   const [form, setForm] = useState({
     rfid: "",
     species: "",
@@ -51,7 +106,7 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
         throw new Error("RFID Number, Sex, and Date of Birth are required.");
       }
 
-      await animalsApi.createAnimal({
+      const animal = await animalsApi.createAnimal({
         tag_number: form.rfid.trim(),
         rfid_tag: form.rfid.trim(),
         name: form.breed.trim(),
@@ -62,6 +117,17 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
         markings: form.markings.trim(),
         current_farm: form.holdingId ? Number(form.holdingId) : null,
       });
+
+      // Upload photos sequentially
+      for (let i = 0; i < photos.length; i++) {
+        const p = photos[i];
+        if (p.kind === "file") {
+          await animalsApi.uploadPhoto(animal.tag_number, p.file, i);
+        } else {
+          await animalsApi.addPhotoUrl(animal.tag_number, p.url, i);
+        }
+      }
+
       onComplete();
     } catch (err) {
       setError(getApiErrorMessage(err, "Unable to register animal. Please try again."));
@@ -194,9 +260,10 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
                   onChange={(e) => updateForm("holdingId", e.target.value)}
                 >
                   <option value="">Select property</option>
-                  <option value="1">Kiambu Dairy Farm</option>
-                  <option value="2">Kisumu Livestock Ranch</option>
-                  <option value="3">Nakuru Valley Dairy</option>
+                  {farms.map((farm) => (
+                    <option key={farm.id} value={String(farm.id)}>{farm.name}</option>
+                  ))}
+                  {farms.length === 0 && <option disabled>No holdings registered yet</option>}
                 </Select>
                 <Input
                   label="Property Address"
@@ -231,12 +298,106 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
                   onChange={(e) => updateForm("markings", e.target.value)}
                 />
                 <div>
-                  <label className="block mb-2 font-medium">Photos</label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                    <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                    <div className="font-medium mb-1">Upload animal photos</div>
-                    <div className="text-muted-foreground">Click to browse or drag and drop</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="font-medium">Photos</label>
+                    <span className="text-sm text-muted-foreground">{photos.length}/{MAX_PHOTOS}</span>
                   </div>
+
+                  {/* Tab switcher */}
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoTab("file")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${photoTab === "file" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <Upload className="w-3.5 h-3.5" /> Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoTab("url")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${photoTab === "url" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <Link className="w-3.5 h-3.5" /> Add URL
+                    </button>
+                  </div>
+
+                  {/* File drop zone */}
+                  {photoTab === "file" && (
+                    <div
+                      onClick={() => photos.length < MAX_PHOTOS && fileInputRef.current?.click()}
+                      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${photos.length >= MAX_PHOTOS ? "opacity-50 cursor-not-allowed border-border" : dragging ? "border-primary bg-primary/5 cursor-copy" : "border-border hover:border-primary cursor-pointer"}`}
+                    >
+                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <div className="font-medium mb-1">
+                        {photos.length >= MAX_PHOTOS ? "Maximum photos reached" : "Click to browse or drag & drop"}
+                      </div>
+                      <div className="text-sm text-muted-foreground">JPG, PNG, WEBP up to 10 MB</div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => addFiles(e.target.files)}
+                        disabled={photos.length >= MAX_PHOTOS}
+                      />
+                    </div>
+                  )}
+
+                  {/* URL input */}
+                  {photoTab === "url" && (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://example.com/animal.jpg"
+                          value={urlInput}
+                          onChange={(e) => { setUrlInput(e.target.value); setUrlError(null); }}
+                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addUrl())}
+                          disabled={photos.length >= MAX_PHOTOS}
+                          className="flex-1 px-3 py-2 bg-input-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={addUrl}
+                          disabled={!urlInput.trim() || photos.length >= MAX_PHOTOS}
+                          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {urlError && <p className="text-sm text-destructive">{urlError}</p>}
+                    </div>
+                  )}
+
+                  {/* Preview grid */}
+                  {photos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-3">
+                      {photos.map((p, i) => (
+                        <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+                          <img
+                            src={p.kind === "file" ? p.preview : p.url}
+                            alt={`Photo ${i + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).src = ""; }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(i)}
+                            className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {i === 0 && (
+                            <span className="absolute bottom-1 left-1 text-[10px] bg-primary text-primary-foreground px-1 rounded">Cover</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

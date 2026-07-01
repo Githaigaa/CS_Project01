@@ -3,8 +3,9 @@ DjangoProject/urls.py
 =======================
 Root URL configuration.
 
-  /          → traceability app (landing page at /)
+  /          → redirects to React frontend
   /admin/    → Django admin
+  /api/v1/   → REST API
   /media/    → Served in development via django.conf.urls.static
 """
 
@@ -12,19 +13,18 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import JsonResponse
 
-urlpatterns =[
-# Django admin
-path("admin/", admin.site.urls),
 
-# REST API v1
-path("api/v1/", include("CattleTrace.api.v1.urls")),
+def api_root(request):
+    return JsonResponse({"status": "ok", "api": "/api/v1/"})
 
-# All platform routes (app_name="CattleTrace")
-path("", include("CattleTrace.urls")),
+
+urlpatterns = [
+    path("", api_root),
+    path("admin/", admin.site.urls),
+    path("api/v1/", include("CattleTrace.api.v1.urls")),
 ]
 
 # Serve uploaded media files during development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -5,7 +7,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
-export function Input({ label, error, className, ...props }: InputProps) {
+export function Input({ label, error, className, type, ...props }: InputProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+  const resolvedType = isPassword ? (showPassword ? "text" : "password") : type;
+
   return (
     <div className="w-full">
       {label && (
@@ -13,16 +19,31 @@ export function Input({ label, error, className, ...props }: InputProps) {
           {label}
         </label>
       )}
-      <input
-        className={cn(
-          "w-full px-3 py-2 bg-input-background border border-input rounded-lg",
-          "focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
-          error && "border-destructive focus:ring-destructive",
-          className
+      <div className="relative">
+        <input
+          type={resolvedType}
+          className={cn(
+            "w-full px-3 py-2 bg-input-background border border-input rounded-lg",
+            "focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            isPassword && "pr-10",
+            error && "border-destructive focus:ring-destructive",
+            className
+          )}
+          {...props}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         )}
-        {...props}
-      />
+      </div>
       {error && (
         <p className="mt-1 text-destructive">{error}</p>
       )}

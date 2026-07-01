@@ -1,39 +1,42 @@
-import { Home, Beef, MapPin, Store, TrendingUp, Heart, FileText, Receipt, Building2, Bell, Settings, User, Menu, X } from "lucide-react";
+import { Beef, Menu, Settings, User, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
+import { getRoleConfig } from "../lib/roleConfig";
+import type { ApiUserRole } from "../lib/api/types";
 
 interface SidebarProps {
   currentPage: string;
   onNavigate: (page: string) => void;
-  userRole?: string;
+  userRole?: ApiUserRole;
+  userName?: string;
 }
 
-export function Sidebar({ currentPage, onNavigate, userRole = "Farmer" }: SidebarProps) {
+export function Sidebar({
+  currentPage,
+  onNavigate,
+  userRole,
+  userName,
+}: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navItems = [
-    { icon: Home, label: "Dashboard", id: "dashboard" },
-    { icon: Beef, label: "Animals", id: "animals" },
-    { icon: MapPin, label: "Holdings", id: "holdings" },
-    { icon: Store, label: "Marketplace", id: "marketplace" },
-    { icon: TrendingUp, label: "Movements", id: "movements" },
-    { icon: Heart, label: "Health Records", id: "health" },
-    { icon: Receipt, label: "Transactions", id: "transactions" },
-    { icon: Building2, label: "Abattoirs", id: "abattoirs" },
-    { icon: FileText, label: "Reports", id: "reports" },
-    { icon: Bell, label: "Notifications", id: "notifications" },
-  ];
+  const config = getRoleConfig(userRole);
 
   const SidebarContent = () => (
     <div className="h-full flex flex-col">
+      {/* Header */}
       <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <Beef className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="font-semibold text-sidebar-foreground">CattleTrace</h1>
-              <p className="text-xs text-muted-foreground">{userRole}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <Beef className={cn("w-8 h-8 flex-shrink-0", config.accentColor)} />
+            <div className="min-w-0">
+              <h1 className="font-semibold text-sidebar-foreground truncate">CattleTrace</h1>
+              <p className={cn("text-xs font-medium truncate", config.accentColor)}>
+                {config.label}
+              </p>
+              {userName && (
+                <p className="text-xs text-muted-foreground truncate">{userName}</p>
+              )}
             </div>
           </div>
         )}
@@ -42,25 +45,26 @@ export function Sidebar({ currentPage, onNavigate, userRole = "Farmer" }: Sideba
             setCollapsed(!collapsed);
             setMobileOpen(false);
           }}
-          className="p-1.5 hover:bg-sidebar-accent rounded-lg transition-colors lg:block hidden"
+          className="p-1.5 hover:bg-sidebar-accent rounded-lg transition-colors lg:block hidden flex-shrink-0"
         >
           <Menu className="w-5 h-5" />
         </button>
         <button
           onClick={() => setMobileOpen(false)}
-          className="p-1.5 hover:bg-sidebar-accent rounded-lg transition-colors lg:hidden"
+          className="p-1.5 hover:bg-sidebar-accent rounded-lg transition-colors lg:hidden flex-shrink-0"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
+      {/* Nav Items */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {config.navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
           return (
             <button
-              key={item.id}
+              key={item.id + item.label}
               onClick={() => {
                 onNavigate(item.id);
                 setMobileOpen(false);
@@ -73,12 +77,13 @@ export function Sidebar({ currentPage, onNavigate, userRole = "Farmer" }: Sideba
               )}
             >
               <Icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span className="truncate">{item.label}</span>}
             </button>
           );
         })}
       </nav>
 
+      {/* Footer */}
       <div className="p-3 border-t border-sidebar-border space-y-1">
         <button
           onClick={() => {

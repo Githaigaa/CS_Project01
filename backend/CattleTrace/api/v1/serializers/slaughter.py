@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from CattleTrace.models import Abattoir, SlaughterRecord
+from CattleTrace.models import Abattoir, Animal, SlaughterRecord
 
 
 class AbattoirSerializer(serializers.ModelSerializer):
@@ -39,6 +39,7 @@ class SlaughterRecordSerializer(serializers.ModelSerializer):
             'abattoir_detail',
             'slaughter_date',
             'slaughter_no',
+            'batch_number',
             'live_weight_kg',
             'carcass_weight_kg',
             'dressing_percentage',
@@ -53,8 +54,17 @@ class SlaughterRecordSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('id', 'inspector', 'dressing_percentage', 'created_at')
 
+    def validate_animal(self, animal):
+        blocked = {Animal.Status.STOLEN, Animal.Status.DECEASED, Animal.Status.SLAUGHTERED}
+        if animal.status in blocked:
+            raise serializers.ValidationError(
+                f"Cannot slaughter an animal with status '{animal.get_status_display()}'. "
+                "Only ALIVE or QUARANTINED animals may be slaughtered."
+            )
+        return animal
+
     def create(self, validated_data):
         user = self.context['request'].user
-        if user.role in (user.Role.INSPECTOR, user.Role.ADMIN):
+        if user.role in (user.Role.INSPECTOR, user.Role.ABATTOIR, user.Role.ADMIN):
             validated_data['inspector'] = user
         return super().create(validated_data)
