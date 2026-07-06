@@ -132,11 +132,11 @@ class Animal(models.Model):
         FEMALE = "F", "Female"
 
     class Status(models.TextChoices):
-        ALIVE = "alive", "Alive"
+        ALIVE = "alive", "Active"
         STOLEN = "stolen", "Stolen"
         SOLD = "sold", "Sold"
         SLAUGHTERED = "slaughtered", "Slaughtered"
-        DECEASED = "deceased", "Deceased"
+        DECEASED = "deceased", "Dead"
         QUARANTINED = "quarantined", "Quarantined"
 
     # Identity
@@ -146,7 +146,10 @@ class Animal(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     # Classification
-    breed = models.ForeignKey(Breed, on_delete=models.SET_NULL, null=True)
+    species = models.CharField(max_length=50, blank=True, help_text="e.g. cattle, goat, sheep")
+    breed = models.ForeignKey(Breed, on_delete=models.SET_NULL, null=True, blank=True)
+    breed_name = models.CharField(max_length=100, blank=True, help_text="Free-text breed when no FK breed selected")
+    age_class = models.CharField(max_length=50, blank=True, help_text="e.g. calf, weaner, yearling, adult")
     sex = models.CharField(max_length=1, choices=Sex.choices)
     date_of_birth = models.DateField()
     color = models.CharField(max_length=50, blank=True)

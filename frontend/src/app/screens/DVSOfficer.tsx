@@ -48,6 +48,8 @@ export function DVSOfficer() {
   const [permitsLoading, setPermitsLoading] = useState(true);
   const [permitsError, setPermitsError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [cahwActionError, setCahwActionError] = useState<string | null>(null);
 
   // Census
   const [countyInput, setCountyInput] = useState("");
@@ -102,24 +104,26 @@ export function DVSOfficer() {
 
   async function handlePermitAction(id: number, action: "approve" | "reject") {
     setActionLoading(id);
+    setActionError(null);
     try {
       await apiClient.post(`/movement-permits/${id}/${action}/`);
       setPermits((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      alert(getApiErrorMessage(err, `Failed to ${action} permit.`));
+      setActionError(getApiErrorMessage(err, `Failed to ${action} permit. Please try again.`));
     } finally {
       setActionLoading(null);
     }
   }
 
   async function handleCahwVerify(id: number, verify: boolean) {
+    setCahwActionError(null);
     try {
       await apiClient.post(`/dvs/cahws/${id}/verify/`, { verify });
       setCahws((prev) =>
         prev.map((c) => (c.id === id ? { ...c, is_cahw_verified: verify } : c))
       );
     } catch (err) {
-      alert(getApiErrorMessage(err, "Failed to update CAHW."));
+      setCahwActionError(getApiErrorMessage(err, "Failed to update CAHW. Please try again."));
     }
   }
 
@@ -201,6 +205,11 @@ export function DVSOfficer() {
             </div>
           </CardHeader>
           <CardContent>
+            {actionError && (
+              <div className="mb-4 text-destructive text-sm bg-destructive/10 px-3 py-2 rounded-md">
+                {actionError}
+              </div>
+            )}
             {permitsLoading ? (
               <div className="flex justify-center py-10">
                 <Loader2 className="w-7 h-7 animate-spin text-primary" />
@@ -324,6 +333,11 @@ export function DVSOfficer() {
             </div>
           </CardHeader>
           <CardContent>
+            {cahwActionError && (
+              <div className="mb-4 text-destructive text-sm bg-destructive/10 px-3 py-2 rounded-md">
+                {cahwActionError}
+              </div>
+            )}
             {cahwsLoading ? (
               <div className="flex justify-center py-10">
                 <Loader2 className="w-7 h-7 animate-spin text-primary" />

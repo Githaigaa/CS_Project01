@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from CattleTrace.models import Abattoir, Animal, SlaughterRecord
+from CattleTrace.models import Abattoir, Animal, SlaughterRecord, User
 
 
 class AbattoirSerializer(serializers.ModelSerializer):
@@ -20,7 +20,7 @@ class AbattoirSerializer(serializers.ModelSerializer):
 
 
 class SlaughterRecordSerializer(serializers.ModelSerializer):
-    inspector = serializers.PrimaryKeyRelatedField(read_only=True)
+    inspector_name = serializers.SerializerMethodField()
     dressing_percentage = serializers.DecimalField(
         max_digits=5,
         decimal_places=2,
@@ -46,6 +46,7 @@ class SlaughterRecordSerializer(serializers.ModelSerializer):
             'hide_weight_kg',
             'offal_weight_kg',
             'inspector',
+            'inspector_name',
             'inspection_result',
             'condemnation_reason',
             'meat_grade',
@@ -54,17 +55,21 @@ class SlaughterRecordSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('id', 'inspector', 'dressing_percentage', 'created_at')
 
+    def get_inspector_name(self, obj):
+        if obj.inspector:
+            return obj.inspector.get_full_name() or obj.inspector.username
+        return None
+
     def validate_animal(self, animal):
-        blocked = {Animal.Status.STOLEN, Animal.Status.DECEASED, Animal.Status.SLAUGHTERED}
-        if animal.status in blocked:
+        if animal.status != Animal.Status.ALIVE:
             raise serializers.ValidationError(
-                f"Cannot slaughter an animal with status '{animal.get_status_display()}'. "
-                "Only ALIVE or QUARANTINED animals may be slaughtered."
+                f"Cannot create a slaughter record for an animal with status "
+                f"'{animal.get_status_display()}'. Only Active animals may be slaughtered."
             )
         return animal
 
     def create(self, validated_data):
         user = self.context['request'].user
-        if user.role in (user.Role.INSPECTOR, user.Role.ABATTOIR, user.Role.ADMIN):
+        if user.role in (User.Role.INSPECTOR, User.Role.ABATTOIR, User.Role.ADMIN):
             validated_data['inspector'] = user
         return super().create(validated_data)

@@ -57,8 +57,11 @@ class AnimalSerializer(serializers.ModelSerializer):
             'rfid_tag',
             'name',
             'uuid',
+            'species',
             'breed',
             'breed_detail',
+            'breed_name',
+            'age_class',
             'sex',
             'date_of_birth',
             'age_months',
@@ -82,6 +85,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             'id',
             'uuid',
             'age_months',
+            'status',
             'current_owner',
             'current_owner_name',
             'current_farm_name',
@@ -113,3 +117,31 @@ class AnimalSerializer(serializers.ModelSerializer):
         validated_data['current_owner'] = user
         validated_data['registered_by'] = user
         return super().create(validated_data)
+
+
+# Statuses a farmer may set directly; SOLD is system-managed (marketplace transaction).
+FARMER_ALLOWED_STATUSES = [
+    Animal.Status.ALIVE,
+    Animal.Status.STOLEN,
+    Animal.Status.DECEASED,
+    Animal.Status.SLAUGHTERED,
+]
+
+
+class AnimalStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=[(s.value, s.label) for s in FARMER_ALLOWED_STATUSES])
+
+    def validate_status(self, value):
+        animal = self.instance
+        # Prevent un-doing a system-managed state
+        locked = {Animal.Status.SOLD, Animal.Status.SLAUGHTERED}
+        if animal.status in locked:
+            raise serializers.ValidationError(
+                f"Cannot change status of an animal that is already '{animal.get_status_display()}'."
+            )
+        return value
+
+    def update(self, instance, validated_data):
+        instance.status = validated_data['status']
+        instance.save(update_fields=['status'])
+        return instance

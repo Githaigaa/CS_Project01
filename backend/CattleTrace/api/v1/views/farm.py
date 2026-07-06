@@ -22,6 +22,14 @@ class FarmViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     ordering_fields = ('created_at', 'name')
     ordering = ('-created_at',)
     owner_field = 'owner'
+    # Roles that may read all holdings (but not write unless they are the owner)
+    def get_queryset(self):
+        user = self.request.user
+        # Abattoir, buyer, DVS, CAHW roles need to read all holdings but cannot write
+        read_all_roles = (User.Role.ABATTOIR, User.Role.BUYER, User.Role.DVS, User.Role.CAHW)
+        if user.is_authenticated and user.role in read_all_roles:
+            return Farm.objects.select_related('owner').prefetch_related('animals').all()
+        return super().get_queryset()
 
     @action(detail=True, methods=['post'], url_path='restrict')
     def restrict(self, request, pk=None):

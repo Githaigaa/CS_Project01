@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Map, Filter, Download, CheckCircle, XCircle, Clock, MapPin, ArrowRight } from "lucide-react";
+import { HoldingsMap } from "../components/HoldingsMap";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
@@ -18,7 +19,9 @@ import { animalsApi } from "../services/api/animals";
 import { getApiErrorMessage } from "../services/api/errors";
 import { movementsApi } from "../services/api/movements";
 import { holdingsApi } from "../services/api/holdings";
+import { slaughterApi } from "../services/api/slaughter";
 import type { ApiFarm } from "../lib/api/holdings";
+import type { ApiAbattoir } from "../lib/api/slaughter";
 
 type FormState = {
   animalRfid: string;
@@ -42,10 +45,20 @@ const emptyForm: FormState = {
   notes: "",
 };
 
-function getHoldingLabel(farms: ApiFarm[], value: string | number | null | undefined) {
+function getHoldingLabel(farms: ApiFarm[], value: string | number | null | undefined, abattoirs: ApiAbattoir[] = []) {
   if (!value) return "";
-  const farm = farms.find((f) => String(f.id) === String(value));
-  return farm ? farm.name : `Holding #${value}`;
+  const str = String(value);
+  if (str.startsWith("abattoir:")) {
+    const id = Number(str.replace("abattoir:", ""));
+    const a = abattoirs.find((ab) => ab.id === id);
+    return a ? a.name : str;
+  }
+  const farm = farms.find((f) => String(f.id) === str);
+  return farm ? farm.name : "";
+}
+
+function isAbattoirValue(value: string) {
+  return value.startsWith("abattoir:");
 }
 
 function purposeFromUi(value: string): ApiMovementPurpose | "" {
@@ -85,6 +98,8 @@ export function Movements() {
   const [editingMovementId, setEditingMovementId] = useState<number | null>(null);
   const [deletingMovementId, setDeletingMovementId] = useState<number | null>(null);
   const [farms, setFarms] = useState<ApiFarm[]>([]);
+  const [abattoirs, setAbattoirs] = useState<ApiAbattoir[]>([]);
+  const farmNamesById = farms.reduce<Record<number, string>>((acc, f) => { acc[f.id] = f.name; return acc; }, {});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +108,7 @@ export function Movements() {
 
   useEffect(() => {
     holdingsApi.listHoldings({ pageSize: 100 }).then((res) => setFarms(res.results)).catch(() => {});
+    slaughterApi.listAbattoirs().then(setAbattoirs).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -133,7 +149,7 @@ export function Movements() {
           return lookup;
         }, {});
         const mappedMovements = movementResponse.results.map((record) =>
-          mapApiMovementToMovement(record, permitLookup),
+          mapApiMovementToMovement(record, permitLookup, farmNamesById),
         );
 
         setRecords(movementResponse.results);
@@ -237,7 +253,7 @@ export function Movements() {
 
     setRecords(movementResponse.results);
     setPermitsById(permitLookup);
-    setMovements(movementResponse.results.map((record) => mapApiMovementToMovement(record, permitLookup)));
+    setMovements(movementResponse.results.map((record) => mapApiMovementToMovement(record, permitLookup, farmNamesById)));
     setTotalMovements(movementResponse.count);
     setNextPageAvailable(Boolean(movementResponse.next));
     setPreviousPageAvailable(Boolean(movementResponse.previous));
@@ -269,15 +285,16 @@ export function Movements() {
     const animalId = await resolveAnimalId(form.animalRfid);
     const permitId = await resolvePermitId(form.permitNumber);
 
+    const destIsAbattoir = isAbattoirValue(form.destinationHolding);
+    const destLabel = getHoldingLabel(farms, form.destinationHolding, abattoirs);
+
     return {
       animal: animalId,
       permit: permitId,
       origin_farm: Number(form.originHolding),
-      destination_farm: Number(form.destinationHolding),
-      origin_county: getHoldingLabel(farms, form.originHolding),
-      destination_county: form.crossBorder
-        ? `${getHoldingLabel(farms, form.destinationHolding)} Cross-Border`
-        : getHoldingLabel(farms, form.destinationHolding),
+      destination_farm: destIsAbattoir ? null : Number(form.destinationHolding),
+      origin_county: getHoldingLabel(farms, form.originHolding, abattoirs),
+      destination_county: form.crossBorder ? `${destLabel} Cross-Border` : destLabel,
       move_date: form.movementDate,
       purpose: form.purpose,
       transporter: form.notes.trim(),
@@ -304,13 +321,20 @@ export function Movements() {
     try {
       const payload = await buildPayload();
       if (editingMovementId) {
-        await movementsApi.updateMovement(editingMovementId, payload);
+        const updated = await movementsApi.updateMovement(editingMovementId, payload);
+        // Immediately reflect changes using the server response, avoiding a
+        // stale re-fetch or a failed refresh masking a successful save.
+        setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+        setMovements((prev) =>
+          prev.map((m) => (m.id === String(updated.id) ? mapApiMovementToMovement(updated, permitsById, farmNamesById) : m)),
+        );
       } else {
         await movementsApi.createMovement(payload);
       }
       resetForm();
       setShowForm(false);
-      await refreshCurrentPage();
+      // Background refresh for ordering/count consistency — errors swallowed intentionally.
+      refreshCurrentPage().catch(() => {});
     } catch (err) {
       setActionError(getApiErrorMessage(err, "Unable to save movement. Please try again."));
     } finally {
@@ -382,7 +406,7 @@ export function Movements() {
     }
   };
 
-  const selectedMovement = selectedRecord ? mapApiMovementToMovement(selectedRecord, permitsById) : null;
+  const selectedMovement = selectedRecord ? mapApiMovementToMovement(selectedRecord, permitsById, farmNamesById) : null;
 
   return (
     <div className="p-6 space-y-6">
@@ -490,13 +514,25 @@ export function Movements() {
                 {farms.map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
               </Select>
               <Select
-                label="Destination Holding *"
+                label="Destination Holding / Abattoir *"
                 value={form.destinationHolding}
                 onChange={(event) => updateForm("destinationHolding", event.target.value)}
               >
                 <option value="">Select destination</option>
-                {farms.length === 0 && <option disabled>No holdings registered yet</option>}
-                {farms.map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+                {farms.length > 0 && (
+                  <optgroup label="Holdings / Farms">
+                    {farms.map((f) => (
+                      <option key={f.id} value={String(f.id)}>{f.name} — {f.county}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {abattoirs.length > 0 && (
+                  <optgroup label="Abattoirs / Slaughter Facilities">
+                    {abattoirs.filter((a) => a.is_active).map((a) => (
+                      <option key={a.id} value={`abattoir:${a.id}`}>{a.name} — {a.county}</option>
+                    ))}
+                  </optgroup>
+                )}
               </Select>
               <Input
                 label="Movement Date *"
@@ -622,15 +658,17 @@ export function Movements() {
       <div className="grid lg:grid-cols-2 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Movement Route Visualization</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <Map className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-muted-foreground">Interactive map showing movement routes and real-time tracking</p>
-              </div>
+            <div className="flex items-center justify-between">
+              <CardTitle>Movement Route Map</CardTitle>
+              {farms.filter((f) => f.gps_latitude).length === 0 && (
+                <span className="text-sm text-muted-foreground">
+                  Add GPS coordinates to holdings to see them on the map
+                </span>
+              )}
             </div>
+          </CardHeader>
+          <CardContent className="p-0 overflow-hidden rounded-b-lg">
+            <HoldingsMap holdings={farms} movements={records} height="460px" />
           </CardContent>
         </Card>
       </div>

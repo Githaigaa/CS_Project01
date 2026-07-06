@@ -2,6 +2,7 @@ import type {
   AnimalListParams,
   AnimalPayload,
   ApiAnimal,
+  FarmerSettableStatus,
   PaginatedResponse,
 } from "../../lib/api/animals";
 import { apiClient } from "./client";
@@ -28,6 +29,8 @@ export const animalsApi = {
         page: params.page,
         page_size: params.pageSize,
         search: params.search || undefined,
+        current_farm: params.current_farm || undefined,
+        status: params.status || undefined,
         ordering: params.ordering,
       },
     });
@@ -67,5 +70,13 @@ export const animalsApi = {
 
   async addPhotoUrl(tagNumber: string, url: string, order: number): Promise<void> {
     await apiClient.post(`/animals/${encodeURIComponent(tagNumber)}/photos/`, { url, order });
+  },
+
+  async updateAnimalStatus(tagNumber: string, status: FarmerSettableStatus): Promise<ApiAnimal> {
+    const { data } = await apiClient.patch<ApiAnimal>(
+      `/animals/${encodeURIComponent(tagNumber)}/status/`,
+      { status },
+    );
+    return data;
   },
 };

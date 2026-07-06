@@ -9,6 +9,7 @@ from .animal import AnimalSerializer
 
 class MarketplaceListingSerializer(serializers.ModelSerializer):
     seller = serializers.PrimaryKeyRelatedField(read_only=True)
+    seller_name = serializers.SerializerMethodField()
     animal_detail = AnimalSerializer(source='animal', read_only=True)
     animal = serializers.PrimaryKeyRelatedField(
         queryset=Animal.objects.filter(status=Animal.Status.ALIVE),
@@ -21,6 +22,7 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             'animal',
             'animal_detail',
             'seller',
+            'seller_name',
             'asking_price',
             'is_negotiable',
             'description',
@@ -31,7 +33,10 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             'views_count',
             'updated_at',
         )
-        read_only_fields = ('id', 'seller', 'listed_on', 'views_count', 'updated_at')
+        read_only_fields = ('id', 'seller', 'seller_name', 'listed_on', 'views_count', 'updated_at')
+
+    def get_seller_name(self, obj):
+        return obj.seller.get_full_name().strip() or obj.seller.username
 
     def validate_animal(self, animal):
         user = self.context['request'].user

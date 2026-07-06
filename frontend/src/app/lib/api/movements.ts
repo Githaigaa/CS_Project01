@@ -100,15 +100,24 @@ function deriveStatus(record: ApiMovementRecord, permit?: ApiMovementPermit): Mo
 export function mapApiMovementToMovement(
   record: ApiMovementRecord,
   permitsById: Record<number, ApiMovementPermit> = {},
+  farmNamesById: Record<number, string> = {},
 ): Movement {
   const permit = record.permit ? permitsById[record.permit] : undefined;
+
+  const fromHolding = record.origin_farm
+    ? (farmNamesById[record.origin_farm] ?? record.origin_county)
+    : record.origin_county;
+
+  const toHolding = record.destination_farm
+    ? (farmNamesById[record.destination_farm] ?? record.destination_county)
+    : record.destination_county;
 
   return {
     id: String(record.id),
     animalId: String(record.animal),
     animalRfid: record.animal_tag,
-    fromHolding: record.origin_farm ? `Holding #${record.origin_farm}` : record.origin_county,
-    toHolding: record.destination_farm ? `Holding #${record.destination_farm}` : record.destination_county,
+    fromHolding,
+    toHolding,
     movementDate: record.move_date,
     purpose: purposeLabels[record.purpose],
     permitNumber: permit?.permit_number,

@@ -11,7 +11,7 @@ export interface Animal {
   distinguishingMarks?: string;
   currentOwner: string;
   currentHolding: string;
-  status: "Active" | "Sold" | "Deceased" | "Slaughtered" | "For Sale";
+  status: "Active" | "Sold" | "Stolen" | "Dead" | "Slaughtered" | "For Sale";
   registrationDate: string;
   photo?: string;
   traceabilityScore?: number;
@@ -63,8 +63,10 @@ export interface MarketplaceListing {
   animalId: string;
   animal: Animal;
   askingPrice: number;
+  isNegotiable: boolean;
   description: string;
   seller: string;
+  locationCounty: string;
   listedDate: string;
   status: "Active" | "Pending" | "Sold" | "Withdrawn";
   views: number;
@@ -91,8 +93,15 @@ export interface SlaughterRecord {
   abattoirId: string;
   abattoirName: string;
   chainNumber: string;
+  batchNumber?: string;
   carcassId: string;
   slaughterDate: string;
+  liveWeightKg?: number;
+  carcassWeightKg?: number;
+  dressingPct?: number;
+  inspectionResult?: string;
+  meatGrade?: string;
+  inspectorName?: string;
   feedback?: string;
   verified: boolean;
 }

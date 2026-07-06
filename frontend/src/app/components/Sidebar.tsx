@@ -1,8 +1,9 @@
-import { Beef, Menu, Settings, User, X } from "lucide-react";
+import { Beef, LogOut, Menu, Settings, User, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
 import { getRoleConfig } from "../lib/roleConfig";
 import type { ApiUserRole } from "../lib/api/types";
+import { useAuth } from "../context/AuthContext";
 
 interface SidebarProps {
   currentPage: string;
@@ -17,6 +18,7 @@ export function Sidebar({
   userRole,
   userName,
 }: SidebarProps) {
+  const { logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -114,6 +116,13 @@ export function Sidebar({
         >
           <User className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
           {!collapsed && <span>Profile</span>}
+        </button>
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+        >
+          <LogOut className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
+          {!collapsed && <span>Log out</span>}
         </button>
       </div>
     </div>

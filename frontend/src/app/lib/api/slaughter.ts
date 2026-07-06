@@ -11,6 +11,15 @@ export interface ApiAbattoir {
   is_active: boolean;
 }
 
+export interface ApiAbattoirPayload {
+  name: string;
+  license_no: string;
+  county: string;
+  address?: string;
+  contact?: string;
+  is_active?: boolean;
+}
+
 export type ApiInspectionResult = "passed" | "passed_partial" | "condemned";
 
 export interface ApiSlaughterRecord {
@@ -21,12 +30,14 @@ export interface ApiSlaughterRecord {
   abattoir_detail: ApiAbattoir | null;
   slaughter_date: string;
   slaughter_no: string;
+  batch_number: string;
   live_weight_kg: string;
   carcass_weight_kg: string;
   dressing_percentage: string | null;
   hide_weight_kg: string | null;
   offal_weight_kg: string | null;
   inspector: number | null;
+  inspector_name: string | null;
   inspection_result: ApiInspectionResult;
   condemnation_reason: string;
   meat_grade: string;
@@ -38,6 +49,15 @@ export interface SlaughterRecordListParams {
   page?: number;
   pageSize?: number;
   ordering?: "slaughter_date" | "-slaughter_date" | "created_at" | "-created_at";
+}
+
+export interface SlaughterStats {
+  total: number;
+  this_week: number;
+  today: number;
+  this_month: number;
+  verified: number;
+  compliance_rate: number;
 }
 
 export type SlaughterRecordListResponse = PaginatedResponse<ApiSlaughterRecord> | ApiSlaughterRecord[];
@@ -56,11 +76,15 @@ export function mapApiSlaughterRecordToSlaughterRecord(record: ApiSlaughterRecor
     abattoirId: record.abattoir ? String(record.abattoir) : "",
     abattoirName: record.abattoir_detail?.name ?? "Unknown abattoir",
     chainNumber: record.slaughter_no,
-    carcassId: record.meat_grade ? `GRADE-${record.meat_grade}` : record.slaughter_no,
+    batchNumber: record.batch_number || undefined,
+    carcassId: record.slaughter_no,
     slaughterDate: record.slaughter_date,
-    // Surface the condemnation reason (set by the inspector on the backend)
-    // ahead of free-form notes — previously this field wasn't modeled on the
-    // frontend at all, so condemned animals showed no reason in the UI.
+    liveWeightKg: record.live_weight_kg ? parseFloat(record.live_weight_kg) : undefined,
+    carcassWeightKg: record.carcass_weight_kg ? parseFloat(record.carcass_weight_kg) : undefined,
+    dressingPct: record.dressing_percentage ? parseFloat(record.dressing_percentage) : undefined,
+    inspectionResult: record.inspection_result,
+    meatGrade: record.meat_grade || undefined,
+    inspectorName: record.inspector_name || undefined,
     feedback: record.condemnation_reason || record.notes || undefined,
     verified: inspectionVerified[record.inspection_result] ?? false,
   };

@@ -14,7 +14,16 @@ export interface BreedSummary {
 }
 
 export type ApiAnimalSex = "M" | "F";
-export type ApiAnimalStatus = "alive" | "sold" | "slaughtered" | "deceased" | "quarantined";
+export type ApiAnimalStatus = "alive" | "sold" | "slaughtered" | "deceased" | "stolen" | "quarantined";
+
+// Statuses a farmer can set manually (mirrors FARMER_ALLOWED_STATUSES in the backend)
+export type FarmerSettableStatus = "alive" | "stolen" | "deceased" | "slaughtered";
+export const FARMER_STATUS_OPTIONS: { value: FarmerSettableStatus; label: string }[] = [
+  { value: "alive",       label: "Active" },
+  { value: "stolen",      label: "Stolen" },
+  { value: "deceased",    label: "Dead" },
+  { value: "slaughtered", label: "Slaughtered" },
+];
 
 export interface ApiAnimal {
   id: number;
@@ -22,8 +31,11 @@ export interface ApiAnimal {
   rfid_tag: string | null;
   name: string;
   uuid: string;
+  species: string;
   breed: number | null;
   breed_detail: BreedSummary | null;
+  breed_name: string;
+  age_class: string;
   sex: ApiAnimalSex;
   date_of_birth: string;
   age_months: number;
@@ -47,6 +59,8 @@ export interface AnimalListParams {
   page?: number;
   pageSize?: number;
   search?: string;
+  current_farm?: number | string;
+  status?: string;
   ordering?: "registration_date" | "-registration_date" | "date_of_birth" | "-date_of_birth" | "created_at" | "-created_at";
 }
 
@@ -54,7 +68,10 @@ export interface AnimalPayload {
   tag_number: string;
   rfid_tag?: string | null;
   name?: string;
+  species?: string;
   breed?: number | null;
+  breed_name?: string;
+  age_class?: string;
   sex: ApiAnimalSex;
   date_of_birth: string;
   color?: string;
@@ -68,21 +85,36 @@ export interface AnimalPayload {
 
 export const animalStatusLabels: Record<ApiAnimalStatus, Animal["status"]> = {
   alive: "Active",
+  stolen: "Stolen",
   sold: "Sold",
   slaughtered: "Slaughtered",
-  deceased: "Deceased",
+  deceased: "Dead",
   quarantined: "Active",
 };
 
 export function mapApiAnimalToAnimal(apiAnimal: ApiAnimal): Animal {
+  // Age class: prefer stored value, fall back to computed from age_months
   const ageClass =
-    apiAnimal.age_months < 12 ? "Calf" : apiAnimal.age_months < 24 ? "Young Stock" : "Adult";
+    apiAnimal.age_class ||
+    (apiAnimal.age_months < 12 ? "Calf" : apiAnimal.age_months < 24 ? "Young Stock" : "Adult");
+
+  // Breed: prefer FK breed name, then free-text breed_name, then legacy name field
+  const breed =
+    apiAnimal.breed_detail?.name ||
+    apiAnimal.breed_name ||
+    apiAnimal.name ||
+    "Unspecified";
+
+  // Species: prefer stored value, fall back to "Cattle" for legacy records
+  const species = apiAnimal.species
+    ? apiAnimal.species.charAt(0).toUpperCase() + apiAnimal.species.slice(1)
+    : "Cattle";
 
   return {
     id: apiAnimal.tag_number,
     rfid: apiAnimal.rfid_tag || apiAnimal.tag_number,
-    species: "Cattle",
-    breed: apiAnimal.breed_detail?.name || apiAnimal.name || "Unspecified",
+    species,
+    breed,
     sex: apiAnimal.sex === "M" ? "Male" : "Female",
     ageClass,
     dateOfBirth: apiAnimal.date_of_birth,

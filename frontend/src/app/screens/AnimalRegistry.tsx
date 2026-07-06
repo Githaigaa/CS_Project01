@@ -1,29 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { Filter, Download, Plus, Eye, Edit, Trash2 } from "lucide-react";
+import { AlertCircle, Download, Eye, Filter, Plus, Trash2, X } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
 import { Input, Select } from "../components/Input";
-import type { ApiAnimalStatus } from "../lib/api/animals";
-import { mapApiAnimalToAnimal } from "../lib/api/animals";
+import { FARMER_STATUS_OPTIONS, mapApiAnimalToAnimal } from "../lib/api/animals";
+import type { FarmerSettableStatus } from "../lib/api/animals";
 import type { Animal } from "../lib/types";
 import { animalsApi } from "../services/api/animals";
 import { getApiErrorMessage } from "../services/api/errors";
+import { useAuth } from "../context/AuthContext";
 
 interface AnimalRegistryProps {
   onViewAnimal: (id: string) => void;
   onRegisterAnimal: () => void;
 }
 
-const STATUS_FILTERS: Record<string, ApiAnimalStatus | null> = {
-  all: null,
-  Active: "alive",
-  Sold: "sold",
-  Slaughtered: "slaughtered",
-  Deceased: "deceased",
-};
-
 export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistryProps) {
+  const { user } = useAuth();
+  const isFarmer = user?.role === "farmer";
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSpecies, setFilterSpecies] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -36,7 +32,9 @@ export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistr
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingAnimalId, setDeletingAnimalId] = useState<string | null>(null);
-  const [editingAnimalId, setEditingAnimalId] = useState<string | null>(null);
+  // Status modal state
+  const [statusModal, setStatusModal] = useState<{ animal: Animal; value: FarmerSettableStatus } | null>(null);
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
   const pageSize = 10;
 
   useEffect(() => {
@@ -96,17 +94,13 @@ export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistr
 
   const getStatusVariant = (status: Animal["status"]) => {
     switch (status) {
-      case "Active":
-        return "success";
-      case "For Sale":
-        return "info";
-      case "Sold":
-        return "secondary";
-      case "Deceased":
-      case "Slaughtered":
-        return "danger";
-      default:
-        return "default";
+      case "Active":    return "success";
+      case "For Sale":  return "info";
+      case "Sold":      return "secondary";
+      case "Stolen":    return "warning";
+      case "Dead":
+      case "Slaughtered": return "danger";
+      default:          return "default";
     }
   };
 
@@ -127,33 +121,32 @@ export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistr
     }
   };
 
-  const handleEditAnimal = async (animal: Animal) => {
-    const rfid = window.prompt("RFID Number", animal.rfid);
-    if (rfid === null) return;
-
-    const color = window.prompt("Color", animal.color || "");
-    if (color === null) return;
-
-    const status = window.prompt(
-      "Status (alive, sold, slaughtered, deceased, quarantined)",
-      STATUS_FILTERS[animal.status] || "alive",
-    ) as ApiAnimalStatus | null;
-    if (status === null) return;
-
-    setEditingAnimalId(animal.id);
+  const openStatusModal = (animal: Animal) => {
+    // Map display label back to API value
+    const apiValueMap: Record<Animal["status"], FarmerSettableStatus> = {
+      "Active":      "alive",
+      "Stolen":      "stolen",
+      "Dead":        "deceased",
+      "Slaughtered": "slaughtered",
+      "Sold":        "alive",      // fallback — can't change sold via this modal
+      "For Sale":    "alive",
+    };
+    setStatusModal({ animal, value: apiValueMap[animal.status] ?? "alive" });
     setActionError(null);
+  };
 
+  const handleStatusSubmit = async () => {
+    if (!statusModal) return;
+    setStatusSubmitting(true);
+    setActionError(null);
     try {
-      await animalsApi.updateAnimal(animal.id, {
-        rfid_tag: rfid.trim() || null,
-        color: color.trim(),
-        status,
-      });
+      await animalsApi.updateAnimalStatus(statusModal.animal.id, statusModal.value);
+      setStatusModal(null);
       await refreshCurrentPage();
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Unable to update animal. Please try again."));
+      setActionError(getApiErrorMessage(err, "Unable to update status. Please try again."));
     } finally {
-      setEditingAnimalId(null);
+      setStatusSubmitting(false);
     }
   };
 
@@ -214,9 +207,10 @@ export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistr
             >
               <option value="all">All Status</option>
               <option value="Active">Active</option>
-              <option value="For Sale">For Sale</option>
-              <option value="Sold">Sold</option>
+              <option value="Stolen">Stolen</option>
+              <option value="Dead">Dead</option>
               <option value="Slaughtered">Slaughtered</option>
+              <option value="Sold">Sold</option>
             </Select>
           </div>
 
@@ -230,8 +224,9 @@ export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistr
               Export
             </Button>
           </div>
-          {actionError && (
-            <div className="text-destructive">
+          {actionError && !statusModal && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               {actionError}
             </div>
           )}
@@ -297,14 +292,15 @@ export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistr
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleEditAnimal(animal)}
-                        disabled={editingAnimalId === animal.id}
-                        className="p-1.5 hover:bg-muted rounded transition-colors"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      {isFarmer && !["Sold", "Slaughtered"].includes(animal.status) && (
+                        <button
+                          onClick={() => openStatusModal(animal)}
+                          className="px-2 py-1 text-xs font-medium border border-border rounded hover:bg-muted transition-colors"
+                          title="Update Status"
+                        >
+                          Status
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeleteAnimal(animal)}
                         disabled={deletingAnimalId === animal.id}
@@ -345,6 +341,56 @@ export function AnimalRegistry({ onViewAnimal, onRegisterAnimal }: AnimalRegistr
           </div>
         </div>
       </Card>
+
+      {/* Status update modal */}
+      {statusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-background border border-border rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-base">Update Animal Status</h2>
+              <button
+                onClick={() => { setStatusModal(null); setActionError(null); }}
+                className="p-1 hover:bg-muted rounded transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Animal: <span className="font-mono font-medium">{statusModal.animal.rfid}</span>
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">New Status</label>
+              <select
+                value={statusModal.value}
+                onChange={(e) => setStatusModal((m) => m ? { ...m, value: e.target.value as FarmerSettableStatus } : null)}
+                className="w-full px-3 py-2 bg-input-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {FARMER_STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            {actionError && (
+              <div className="flex items-start gap-2 p-3 mb-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                {actionError}
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => { setStatusModal(null); setActionError(null); }}
+                disabled={statusSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleStatusSubmit} disabled={statusSubmitting}>
+                {statusSubmitting ? "Saving..." : "Save Status"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ export interface ApiMarketplaceListing {
   animal: number;
   animal_detail: ApiAnimal;
   seller: number;
+  seller_name: string;
   asking_price: string;
   is_negotiable: boolean;
   description: string;
@@ -87,8 +88,10 @@ export function mapApiListingToListing(listing: ApiMarketplaceListing, inquiryCo
     animalId: String(listing.animal),
     animal: mapApiAnimalToAnimal(listing.animal_detail),
     askingPrice: Number(listing.asking_price),
+    isNegotiable: listing.is_negotiable,
     description: listing.description,
-    seller: `Seller #${listing.seller}`,
+    seller: listing.seller_name || `Seller #${listing.seller}`,
+    locationCounty: listing.location_county,
     listedDate: listing.listed_on,
     status: statusLabels[listing.status],
     views: listing.views_count,

@@ -23,6 +23,50 @@ type FormState = {
   notes: string;
 };
 
+const DISEASE_OPTIONS = [
+  "Foot and Mouth Disease (FMD)",
+  "East Coast Fever (ECF)",
+  "Contagious Bovine Pleuropneumonia (CBPP)",
+  "Lumpy Skin Disease (LSD)",
+  "Rift Valley Fever (RVF)",
+  "Brucellosis",
+  "Blackleg (Clostridial Disease)",
+  "Trypanosomiasis (Sleeping Sickness)",
+  "Anthrax",
+  "Bovine Tuberculosis (BTB)",
+  "Mastitis",
+  "Bovine Respiratory Disease (BRD)",
+  "Peste des Petits Ruminants (PPR)",
+  "Contagious Caprine Pleuropneumonia (CCPP)",
+  "Sheep Pox / Goat Pox",
+  "Contagious Ecthyma (Orf)",
+  "African Swine Fever (ASF)",
+  "Newcastle Disease",
+  "Heartwater (Cowdriosis)",
+  "Anaplasmosis",
+  "Babesiosis (Redwater)",
+];
+
+const VACCINE_OPTIONS = [
+  "FMD Vaccine",
+  "ECF Vaccine (Muguga Cocktail)",
+  "CBPP Vaccine",
+  "LSD Vaccine",
+  "RVF Vaccine",
+  "Brucella Vaccine (S19/RB51)",
+  "Blackleg / Clostridial Vaccine",
+  "Anthrax Vaccine (Sterne)",
+  "PPR Vaccine",
+  "CCPP Vaccine",
+  "Sheep Pox / Goat Pox Vaccine",
+  "Rabies Vaccine",
+  "Heartwater Vaccine",
+  "Anaplasmosis Vaccine",
+  "Dewormer (Ivermectin)",
+  "Dewormer (Albendazole)",
+  "Tick Dip / Acaricide",
+];
+
 const emptyForm: FormState = {
   animalTag: "",
   eventType: "",
@@ -209,14 +253,22 @@ export function HealthRecords() {
       const payload = toPayload(form, animalId);
 
       if (editingRecordId) {
-        await healthApi.updateHealthRecord(editingRecordId, payload);
+        const updated = await healthApi.updateHealthRecord(editingRecordId, payload);
+        // Use the server response to update the specific record immediately,
+        // rather than waiting for a full re-fetch that could fail or be stale.
+        setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+        setEvents((prev) =>
+          prev.map((e) => (e.id === String(updated.id) ? mapApiHealthRecordToHealthEvent(updated) : e)),
+        );
       } else {
         await healthApi.createHealthRecord(payload);
       }
 
       resetForm();
       setShowForm(false);
-      await refreshCurrentPage();
+      // Background refresh for full consistency (e.g. new record ordering, count).
+      // Errors here are intentionally swallowed — the save already succeeded above.
+      refreshCurrentPage().catch(() => {});
     } catch (err) {
       setActionError(getApiErrorMessage(err, "Unable to save health record. Please try again."));
     } finally {
@@ -480,12 +532,49 @@ export function HealthRecords() {
                 <option value="injury">Injury</option>
                 <option value="death">Death</option>
               </Select>
-              <Input
-                label="Disease/Vaccine Name"
-                placeholder="e.g., FMD, ECF, PPR, CBPP"
-                value={form.diseaseName}
-                onChange={(event) => updateForm("diseaseName", event.target.value)}
-              />
+              {form.eventType === "disease" || form.eventType === "vaccination" ? (() => {
+                const options = form.eventType === "vaccination" ? VACCINE_OPTIONS : DISEASE_OPTIONS;
+                const isCustom = form.diseaseName !== "" && !options.includes(form.diseaseName);
+                const selectValue = isCustom ? "__other__" : form.diseaseName;
+                return (
+                  <>
+                    <Select
+                      label={form.eventType === "vaccination" ? "Vaccine Name" : "Disease Name"}
+                      value={selectValue}
+                      onChange={(event) => {
+                        if (event.target.value === "__other__") {
+                          updateForm("diseaseName", "");
+                        } else {
+                          updateForm("diseaseName", event.target.value);
+                        }
+                      }}
+                    >
+                      <option value="">
+                        {form.eventType === "vaccination" ? "Select vaccine..." : "Select disease..."}
+                      </option>
+                      {options.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                      <option value="__other__">Other (specify below)</option>
+                    </Select>
+                    {selectValue === "__other__" && (
+                      <Input
+                        label="Specify Name"
+                        placeholder={form.eventType === "vaccination" ? "Custom vaccine name" : "Custom disease name"}
+                        value={form.diseaseName}
+                        onChange={(event) => updateForm("diseaseName", event.target.value)}
+                      />
+                    )}
+                  </>
+                );
+              })() : (
+                <Input
+                  label="Disease/Vaccine Name"
+                  placeholder="e.g., medication, treatment type"
+                  value={form.diseaseName}
+                  onChange={(event) => updateForm("diseaseName", event.target.value)}
+                />
+              )}
               <Input
                 label="Date"
                 type="date"

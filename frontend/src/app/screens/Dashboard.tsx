@@ -27,6 +27,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatDate } from "../lib/utils";
+import { getApiErrorMessage } from "../services/api/errors";
 import { dashboardApi } from "../services/api/dashboard";
 import { mapApiMovementRecord, mapApiHealthRecord } from "../lib/api/animalProfile";
 import type { DashboardData } from "../lib/api/dashboard";
@@ -54,6 +55,7 @@ function getMonthLabel(date: string) {
 export function Dashboard() {
   const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Derived UI lists — mapped from raw API shapes to UI types
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -65,6 +67,7 @@ export function Dashboard() {
 
     async function load() {
       setLoading(true);
+      setLoadError(null);
       const [result, animalResult] = await Promise.allSettled([
         dashboardApi.getDashboardData(),
         animalsApi.listAnimals({ pageSize: 100, ordering: "-registration_date" }),
@@ -75,6 +78,8 @@ export function Dashboard() {
         setData(result.value);
         setMovements(result.value.recentMovements.map(mapApiMovementRecord));
         setHealthEvents(result.value.recentHealthEvents.map(mapApiHealthRecord));
+      } else {
+        setLoadError(getApiErrorMessage(result.reason, "Unable to load dashboard data. Please refresh the page."));
       }
 
       if (animalResult.status === "fulfilled") {
@@ -121,6 +126,12 @@ export function Dashboard() {
         <h1 className="mb-2">Dashboard</h1>
         <p className="text-muted-foreground">Overview of your livestock management system</p>
       </div>
+
+      {loadError && (
+        <div className="text-destructive text-sm bg-destructive/10 px-4 py-3 rounded-md">
+          {loadError}
+        </div>
+      )}
 
       {/* ── Stat Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

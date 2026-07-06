@@ -74,8 +74,8 @@ export type HealthRecordListResponse = PaginatedResponse<ApiHealthRecord> | ApiH
 
 function getEventType(record: ApiHealthRecord): HealthEvent["eventType"] {
   if (record.record_type === "vaccination") return "Vaccination";
+  if (record.record_type === "examination") return "Disease";
   if (record.diagnosis_detail) return "Disease";
-  if (record.record_type === "other") return "Treatment";
   return "Treatment";
 }
 

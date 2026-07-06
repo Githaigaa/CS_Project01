@@ -39,13 +39,34 @@ export const reportsApi = {
     format: ReportExportFormat,
     params: ReportDateParams = {},
   ): Promise<void> {
-    const response = await apiClient.get(`/reports/${reportType}/export/`, {
-      params: {
-        ...buildDateQueryParams(params),
-        format,
-      },
-      responseType: "blob",
-    });
+    let response;
+    try {
+      response = await apiClient.get(`/reports/${reportType}/export/`, {
+        params: {
+          ...buildDateQueryParams(params),
+          format,
+        },
+        responseType: "blob",
+      });
+    } catch (err: unknown) {
+      // When responseType is "blob", axios wraps error bodies as Blobs.
+      // Read the blob as text so getApiErrorMessage can parse the JSON detail.
+      if (
+        err &&
+        typeof err === "object" &&
+        "response" in err &&
+        (err as { response?: { data?: unknown } }).response?.data instanceof Blob
+      ) {
+        const blob = (err as { response: { data: Blob } }).response.data;
+        const text = await blob.text();
+        try {
+          (err as { response: { data: unknown } }).response.data = JSON.parse(text);
+        } catch {
+          (err as { response: { data: unknown } }).response.data = text;
+        }
+      }
+      throw err;
+    }
 
     const extension = format === "pdf" ? "pdf" : "csv";
     const fallback = `cattletrace-${reportType}-report.${extension}`;

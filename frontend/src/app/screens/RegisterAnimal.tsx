@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Link, Upload, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Check, Link, Upload, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
 import { Button } from "../components/Button";
 import { Input, Select, Textarea } from "../components/Input";
 import { animalsApi } from "../services/api/animals";
 import { holdingsApi } from "../services/api/holdings";
 import type { ApiFarm } from "../lib/api/holdings";
-import { getApiErrorMessage } from "../services/api/errors";
+import { getApiErrorMessage, getApiFieldErrors } from "../services/api/errors";
+import { useAuth } from "../context/AuthContext";
 
 interface RegisterAnimalProps {
   onBack: () => void;
@@ -14,10 +15,14 @@ interface RegisterAnimalProps {
 }
 
 export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stepError, setStepError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [farms, setFarms] = useState<ApiFarm[]>([]);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     holdingsApi.listHoldings({ pageSize: 100 }).then((res) => setFarms(res.results)).catch(() => {});
@@ -93,23 +98,100 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
     { number: 4, title: "Review & Submit" },
   ];
 
+  const AGE_CLASSES: Record<string, { value: string; label: string }[]> = {
+    cattle: [
+      { value: "calf", label: "Calf (< 6 months)" },
+      { value: "weaner", label: "Weaner (6–12 months)" },
+      { value: "yearling", label: "Yearling (1–2 years)" },
+      { value: "adult", label: "Adult (> 2 years)" },
+    ],
+    goat: [
+      { value: "kid", label: "Kid (< 4 months)" },
+      { value: "weaner", label: "Weaner (4–8 months)" },
+      { value: "yearling", label: "Yearling (8–18 months)" },
+      { value: "adult", label: "Adult (> 18 months)" },
+    ],
+    sheep: [
+      { value: "lamb", label: "Lamb (< 4 months)" },
+      { value: "weaner", label: "Weaner (4–8 months)" },
+      { value: "hogget", label: "Hogget (8–18 months)" },
+      { value: "adult", label: "Adult (> 18 months)" },
+    ],
+    camel: [
+      { value: "calf", label: "Calf (< 1 year)" },
+      { value: "sub-adult", label: "Sub-adult (1–4 years)" },
+      { value: "adult", label: "Adult (> 4 years)" },
+    ],
+    donkey: [
+      { value: "foal", label: "Foal (< 1 year)" },
+      { value: "yearling", label: "Yearling (1–2 years)" },
+      { value: "adult", label: "Adult (> 2 years)" },
+    ],
+    poultry: [
+      { value: "chick", label: "Chick (< 4 weeks)" },
+      { value: "grower", label: "Grower (4–20 weeks)" },
+      { value: "adult", label: "Adult (> 20 weeks)" },
+    ],
+  };
+
+  const BREED_PLACEHOLDERS: Record<string, string> = {
+    cattle: "e.g. Boran, Friesian, Sahiwal",
+    goat: "e.g. Galla, Boer, Toggenburg",
+    sheep: "e.g. Dorper, Red Maasai, Merino",
+    camel: "e.g. Somali, Sudan",
+    donkey: "e.g. Somali, Nubian",
+    poultry: "e.g. Kienyeji, Kenbro, Broiler",
+  };
+
   const updateForm = (field: keyof typeof form, value: string) => {
-    setForm((currentForm) => ({ ...currentForm, [field]: value }));
+    setForm((currentForm) => {
+      const next = { ...currentForm, [field]: value };
+      if (field === "species") next.ageClass = "";
+      return next;
+    });
+    // Clear field-level error when user edits the field
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    setStepError(null);
+  };
+
+  const validateStep1 = (): string | null => {
+    if (!form.rfid.trim()) return "RFID Number is required.";
+    if (!form.species) return "Species is required.";
+    if (!form.sex) return "Sex is required.";
+    if (!form.dateOfBirth) return "Date of Birth is required.";
+    return null;
+  };
+
+  const handleNext = () => {
+    setStepError(null);
+    if (step === 1) {
+      const err = validateStep1();
+      if (err) {
+        setStepError(err);
+        return;
+      }
+    }
+    setStep(Math.min(4, step + 1));
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);
+    setFieldErrors({});
 
     try {
-      if (!form.rfid.trim() || !form.sex || !form.dateOfBirth) {
-        throw new Error("RFID Number, Sex, and Date of Birth are required.");
-      }
-
       const animal = await animalsApi.createAnimal({
         tag_number: form.rfid.trim(),
         rfid_tag: form.rfid.trim(),
         name: form.breed.trim(),
+        species: form.species,
+        breed_name: form.breed.trim(),
+        age_class: form.ageClass,
         breed: null,
         sex: form.sex === "male" ? "M" : "F",
         date_of_birth: form.dateOfBirth,
@@ -130,7 +212,16 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
 
       onComplete();
     } catch (err) {
+      const fieldErrs = getApiFieldErrors(err);
+      if (Object.keys(fieldErrs).length > 0) {
+        setFieldErrors(fieldErrs);
+        // Map backend field names to steps so we can jump back
+        const step1Fields = new Set(["tag_number", "rfid_tag", "sex", "date_of_birth"]);
+        const isStep1Error = Object.keys(fieldErrs).some((f) => step1Fields.has(f));
+        if (isStep1Error) setStep(1);
+      }
       setError(getApiErrorMessage(err, "Unable to register animal. Please try again."));
+      setTimeout(() => errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
     } finally {
       setSubmitting(false);
     }
@@ -182,12 +273,23 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
           <CardContent>
             {step === 1 && (
               <div className="space-y-4">
-                <Input
-                  label="RFID Number *"
-                  placeholder="254000123456789"
-                  value={form.rfid}
-                  onChange={(e) => updateForm("rfid", e.target.value)}
-                />
+                {stepError && (
+                  <div ref={errorRef} className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    {stepError}
+                  </div>
+                )}
+                <div>
+                  <Input
+                    label="RFID Number *"
+                    placeholder="254000123456789"
+                    value={form.rfid}
+                    onChange={(e) => updateForm("rfid", e.target.value)}
+                  />
+                  {(fieldErrors.tag_number || fieldErrors.rfid_tag) && (
+                    <p className="mt-1 text-sm text-destructive">{fieldErrors.tag_number || fieldErrors.rfid_tag}</p>
+                  )}
+                </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <Select
                     label="Species *"
@@ -204,7 +306,7 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
                   </Select>
                   <Input
                     label="Breed *"
-                    placeholder="e.g., Boran, Friesian, Sahiwal"
+                    placeholder={BREED_PLACEHOLDERS[form.species] ?? "e.g. Boran, Friesian, Sahiwal"}
                     value={form.breed}
                     onChange={(e) => updateForm("breed", e.target.value)}
                   />
@@ -223,19 +325,27 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
                     label="Age Class *"
                     value={form.ageClass}
                     onChange={(e) => updateForm("ageClass", e.target.value)}
+                    disabled={!form.species}
                   >
-                    <option value="">Select age class</option>
-                    <option value="calf">Calf</option>
-                    <option value="young-stock">Young Stock</option>
-                    <option value="adult">Adult</option>
+                    <option value="">
+                      {form.species ? "Select age class" : "Select species first"}
+                    </option>
+                    {(AGE_CLASSES[form.species] ?? []).map((cls) => (
+                      <option key={cls.value} value={cls.value}>{cls.label}</option>
+                    ))}
                   </Select>
                 </div>
-                <Input
-                  label="Date of Birth"
-                  type="date"
-                  value={form.dateOfBirth}
-                  onChange={(e) => updateForm("dateOfBirth", e.target.value)}
-                />
+                <div>
+                  <Input
+                    label="Date of Birth *"
+                    type="date"
+                    value={form.dateOfBirth}
+                    onChange={(e) => updateForm("dateOfBirth", e.target.value)}
+                  />
+                  {fieldErrors.date_of_birth && (
+                    <p className="mt-1 text-sm text-destructive">{fieldErrors.date_of_birth}</p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -413,29 +523,61 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
                     </div>
                     <div>
                       <div className="text-muted-foreground">Species</div>
-                      <div className="font-medium">{form.species || "Not provided"}</div>
+                      <div className="font-medium capitalize">{form.species || "Not provided"}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Breed</div>
                       <div className="font-medium">{form.breed || "Not provided"}</div>
                     </div>
                     <div>
+                      <div className="text-muted-foreground">Age Class</div>
+                      <div className="font-medium capitalize">{form.ageClass || "Not provided"}</div>
+                    </div>
+                    <div>
                       <div className="text-muted-foreground">Sex</div>
-                      <div className="font-medium">{form.sex || "Not provided"}</div>
+                      <div className="font-medium capitalize">{form.sex || "Not provided"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Date of Birth</div>
+                      <div className="font-medium">{form.dateOfBirth || "Not provided"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Color</div>
+                      <div className="font-medium">{form.color || "Not provided"}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Owner</div>
-                      <div className="font-medium">{form.ownerName || "Current user"}</div>
+                      <div className="font-medium">
+                        {user
+                          ? (user.first_name && user.last_name
+                              ? `${user.first_name} ${user.last_name}`
+                              : user.username)
+                          : (form.ownerName || "Current user")}
+                      </div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Property</div>
-                      <div className="font-medium">{form.holdingId ? `Holding #${form.holdingId}` : "Unassigned"}</div>
+                      <div className="font-medium">
+                        {form.holdingId
+                          ? (farms.find((f) => String(f.id) === form.holdingId)?.name ?? `Farm #${form.holdingId}`)
+                          : "Unassigned"}
+                      </div>
                     </div>
+                    {photos.length > 0 && (
+                      <div>
+                        <div className="text-muted-foreground">Photos</div>
+                        <div className="font-medium">{photos.length} photo{photos.length !== 1 ? "s" : ""} attached</div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {error && (
-                  <div className="text-destructive">
-                    {error}
+                  <div ref={errorRef} className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Registration failed</p>
+                      <p className="text-sm mt-0.5">{error}</p>
+                    </div>
                   </div>
                 )}
                 <div className="flex items-center gap-2 p-4 bg-primary/10 rounded-lg border border-primary/20">
@@ -450,14 +592,14 @@ export function RegisterAnimal({ onBack, onComplete }: RegisterAnimalProps) {
             <div className="flex justify-between mt-8 pt-6 border-t border-border">
               <Button
                 variant="outline"
-                onClick={() => setStep(Math.max(1, step - 1))}
+                onClick={() => { setStepError(null); setStep(Math.max(1, step - 1)); }}
                 disabled={step === 1}
               >
                 <ArrowLeft className="w-5 h-5" />
                 Previous
               </Button>
               {step < 4 ? (
-                <Button onClick={() => setStep(Math.min(4, step + 1))}>
+                <Button onClick={handleNext}>
                   Next
                   <ArrowRight className="w-5 h-5" />
                 </Button>

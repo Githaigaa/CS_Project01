@@ -21,8 +21,9 @@ import { Input, Select } from "../components/Input";
 import { Skeleton } from "../components/Skeleton";
 import { holdingsApi } from "../services/api/holdings";
 import { mapApiFarmToHolding } from "../lib/api/holdings";
-import type { UiHolding, HoldingPayload } from "../lib/api/holdings";
+import type { ApiFarm, UiHolding, HoldingPayload } from "../lib/api/holdings";
 import { getApiErrorMessage, getApiFieldErrors } from "../services/api/errors";
+import { HoldingsMap } from "../components/HoldingsMap";
 
 // ─────────────────────────────────────────────
 // Constants
@@ -360,6 +361,7 @@ function HoldingDetailPanel({
 export function Holdings() {
   // ── List state ───────────────────────────────────────────────────────────
   const [holdings, setHoldings] = useState<UiHolding[]>([]);
+  const [rawFarms, setRawFarms] = useState<ApiFarm[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
@@ -399,6 +401,7 @@ export function Holdings() {
         search: searchQuery.trim() || undefined,
         ordering,
       });
+      setRawFarms(result.results);
       setHoldings(result.results.map(mapApiFarmToHolding));
       setTotalCount(result.count);
       setHasNext(Boolean(result.next));
@@ -502,22 +505,23 @@ export function Holdings() {
         </Button>
       </div>
 
-      {/* ── Map placeholder ───────────────────────────────────────────────── */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Map View</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <Map className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-muted-foreground">Interactive GIS map showing all holdings</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* ── Holdings map ──────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Holdings Map</CardTitle>
+            {rawFarms.filter((f) => f.gps_latitude).length === 0 && (
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                Add GPS coordinates to a holding to pin it on the map
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-hidden rounded-b-lg">
+          <HoldingsMap holdings={rawFarms} height="460px" />
+        </CardContent>
+      </Card>
 
       {/* ── Filters ───────────────────────────────────────────────────────── */}
       <Card>
