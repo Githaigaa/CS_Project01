@@ -1,17 +1,19 @@
 """Marketplace API viewsets."""
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from CattleTrace.api.permissions import (
     IsInquiryParticipant,
     IsSellerOrReadOnly,
     IsTransactionParticipant,
 )
-from CattleTrace.api.v1.mixins import RoleScopedQuerysetMixin, SellerQuerysetMixin
+from CattleTrace.api.v1.mixins import RoleScopedQuerysetMixin, SellerQuerysetMixin, SignalValidationMixin
 from CattleTrace.api.v1.serializers import (
     MarketplaceInquirySerializer,
     MarketplaceListingSerializer,
@@ -20,7 +22,7 @@ from CattleTrace.api.v1.serializers import (
 from CattleTrace.models import MarketplaceInquiry, MarketplaceListing, Transaction, User
 
 
-class MarketplaceListingViewSet(SellerQuerysetMixin, viewsets.ModelViewSet):
+class MarketplaceListingViewSet(SignalValidationMixin, SellerQuerysetMixin, viewsets.ModelViewSet):
     queryset = MarketplaceListing.objects.select_related(
         'animal',
         'animal__breed',
@@ -84,9 +86,11 @@ class MarketplaceInquiryViewSet(
 
 
 class TransactionViewSet(
+    SignalValidationMixin,
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
     queryset = Transaction.objects.select_related(
@@ -102,6 +106,36 @@ class TransactionViewSet(
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == User.Role.ADMIN:
-            return self.queryset
-        return self.queryset.filter(Q(buyer=user) | Q(seller=user))
+        qs = self.queryset
+        if user.role != User.Role.ADMIN:
+            qs = qs.filter(Q(buyer=user) | Q(seller=user))
+
+        payment_status = self.request.query_params.get('payment_status')
+        if payment_status and payment_status != 'all':
+            qs = qs.filter(payment_status=payment_status)
+
+        return qs
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """Aggregate stats for the current user's transactions."""
+        user = request.user
+        qs = Transaction.objects.all()
+        if user.role != User.Role.ADMIN:
+            qs = qs.filter(Q(buyer=user) | Q(seller=user))
+
+        total = qs.count()
+        total_revenue = qs.filter(payment_status='paid').aggregate(
+            s=Sum('agreed_price')
+        )['s'] or 0
+        pending = qs.filter(payment_status='pending').count()
+        paid = qs.filter(payment_status='paid').count()
+        failed = qs.filter(payment_status='failed').count()
+
+        return Response({
+            'total': total,
+            'total_revenue': str(total_revenue),
+            'pending': pending,
+            'paid': paid,
+            'failed': failed,
+        })

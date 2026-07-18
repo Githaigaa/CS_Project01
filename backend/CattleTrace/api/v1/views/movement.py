@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from CattleTrace.api.permissions import IsMovementAuthorized
-from CattleTrace.api.v1.mixins import AnimalRelatedQuerysetMixin, RoleScopedQuerysetMixin
+from CattleTrace.api.v1.mixins import AnimalRelatedQuerysetMixin, RoleScopedQuerysetMixin, SignalValidationMixin
 from CattleTrace.api.v1.serializers import MovementPermitSerializer, MovementRecordSerializer
 from CattleTrace.models import MovementPermit, MovementRecord, Notification, User
 
@@ -105,7 +105,7 @@ class MovementPermitViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
         return Response({'detail': 'Permit rejected.', 'status': permit.status})
 
 
-class MovementRecordViewSet(AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):
+class MovementRecordViewSet(SignalValidationMixin, AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):
     queryset = MovementRecord.objects.select_related(
         'animal',
         'permit',
@@ -141,3 +141,4 @@ class MovementRecordViewSet(AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):
         if permit_status:
             queryset = queryset.filter(permit__status=permit_status)
         return queryset
+

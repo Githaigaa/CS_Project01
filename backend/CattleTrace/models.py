@@ -286,6 +286,7 @@ class HealthRecord(models.Model):
     temperature = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
     notes = models.TextField(blank=True)
     certificate_no = models.CharField(max_length=100, blank=True)
+    vet_document = models.FileField(upload_to="health/vet_docs/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -500,11 +501,19 @@ class Transaction(models.Model):
         CASH = "cash", "Cash"
         OTHER = "other", "Other"
 
+    class PaymentStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PAID = "paid", "Paid"
+        FAILED = "failed", "Failed"
+
     listing = models.OneToOneField(MarketplaceListing, on_delete=models.CASCADE, related_name="transaction")
     buyer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="purchases")
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sales")
     agreed_price = models.DecimalField(max_digits=12, decimal_places=2)
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
+    payment_status = models.CharField(
+        max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.PENDING,
+    )
     payment_ref = models.CharField(max_length=100, blank=True)
     transaction_date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)

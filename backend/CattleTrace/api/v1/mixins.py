@@ -1,6 +1,26 @@
 """Shared queryset and auth helpers for API v1 viewsets."""
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+
+from rest_framework.exceptions import ValidationError as DRFValidationError
+
 from CattleTrace.models import User
+
+
+class SignalValidationMixin:
+    """Convert DjangoValidationError raised by pre_save signals into DRF 400 responses."""
+
+    def perform_create(self, serializer):
+        try:
+            super().perform_create(serializer)
+        except DjangoValidationError as exc:
+            raise DRFValidationError(detail=exc.messages)
+
+    def perform_update(self, serializer):
+        try:
+            super().perform_update(serializer)
+        except DjangoValidationError as exc:
+            raise DRFValidationError(detail=exc.messages)
 
 
 class RoleScopedQuerysetMixin:

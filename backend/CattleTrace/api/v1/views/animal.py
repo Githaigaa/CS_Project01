@@ -8,13 +8,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from CattleTrace.api.permissions import IsAnimalOwnerOrStaff
-from CattleTrace.api.v1.mixins import RoleScopedQuerysetMixin
+from CattleTrace.api.v1.mixins import RoleScopedQuerysetMixin, SignalValidationMixin
 from CattleTrace.api.v1.serializers import AnimalSerializer
 from CattleTrace.api.v1.serializers.animal import AnimalPhotoSerializer, AnimalStatusSerializer
 from CattleTrace.models import Animal, AnimalPhoto, User
 
 
-class AnimalViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
+class AnimalViewSet(SignalValidationMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     queryset = Animal.objects.select_related(
         'breed',
         'current_owner',

@@ -48,6 +48,7 @@ class HealthRecordSerializer(serializers.ModelSerializer):
             'temperature',
             'notes',
             'certificate_no',
+            'vet_document',
             'created_at',
         )
         read_only_fields = ('id', 'vet', 'vet_name', 'credibility_level', 'is_escalated', 'created_at')

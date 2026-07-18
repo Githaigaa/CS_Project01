@@ -78,6 +78,7 @@ export interface ApiTransaction {
   seller_name?: string;
   agreed_price: string;
   payment_method: string;
+  payment_status: "pending" | "paid" | "failed";
   payment_ref: string;
   transaction_date: string;
   notes: string;

@@ -44,6 +44,7 @@ export interface ApiHealthRecord {
   temperature: string | null;
   notes: string;
   certificate_no: string;
+  vet_document: string | null;
   created_at: string;
 }
 
@@ -68,6 +69,7 @@ export interface HealthRecordPayload {
   temperature?: string | null;
   notes?: string;
   certificate_no?: string;
+  vet_document?: File | null;
 }
 
 export type HealthRecordListResponse = PaginatedResponse<ApiHealthRecord> | ApiHealthRecord[];

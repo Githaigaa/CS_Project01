@@ -1,5 +1,5 @@
-import { Plus, Heart, AlertTriangle, Syringe, Activity, ArrowUpCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Plus, Heart, AlertTriangle, Syringe, Activity, ArrowUpCircle, FileText, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
@@ -12,6 +12,7 @@ import { animalsApi } from "../services/api/animals";
 import { getApiErrorMessage } from "../services/api/errors";
 import { healthApi } from "../services/api/health";
 import { apiClient } from "../services/api/client";
+import { useAuth } from "../context/AuthContext";
 
 type FormState = {
   animalTag: string;
@@ -21,6 +22,7 @@ type FormState = {
   recordedBy: string;
   credentialLevel: string;
   notes: string;
+  vetDocument: File | null;
 };
 
 const DISEASE_OPTIONS = [
@@ -75,6 +77,7 @@ const emptyForm: FormState = {
   recordedBy: "",
   credentialLevel: "",
   notes: "",
+  vetDocument: null,
 };
 
 function toPayload(form: FormState, animalId: number): HealthRecordPayload {
@@ -91,6 +94,7 @@ function toPayload(form: FormState, animalId: number): HealthRecordPayload {
     date: form.date,
     medication: form.diseaseName.trim(),
     notes: form.notes.trim(),
+    vet_document: form.vetDocument ?? undefined,
   };
 }
 
@@ -110,10 +114,15 @@ function formFromRecord(record: ApiHealthRecord): FormState {
     recordedBy: event.recordedBy,
     credentialLevel: event.credentialLevel,
     notes: record.notes,
+    vetDocument: null,
   };
 }
 
 export function HealthRecords() {
+  const { user } = useAuth();
+  const canWrite = user?.role === "vet" || user?.role === "cahw";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [records, setRecords] = useState<ApiHealthRecord[]>([]);
@@ -357,10 +366,12 @@ export function HealthRecords() {
           <h1 className="mb-2">Health Records</h1>
           <p className="text-muted-foreground">Monitor animal health and manage medical events</p>
         </div>
-        <Button onClick={handleCreateClick}>
-          <Plus className="w-5 h-5" />
-          Record Health Event
-        </Button>
+        {canWrite && (
+          <Button onClick={handleCreateClick}>
+            <Plus className="w-5 h-5" />
+            Record Health Event
+          </Button>
+        )}
       </div>
 
       <div className="grid md:grid-cols-4 gap-6">
@@ -486,21 +497,39 @@ export function HealthRecords() {
                   {selectedEvent.notes}
                 </div>
               )}
+              {selectedRecord?.vet_document && (
+                <div className="pt-2 border-t border-border">
+                  <div className="text-muted-foreground mb-1">Credential Document</div>
+                  <a
+                    href={selectedRecord.vet_document}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-primary hover:underline text-sm"
+                  >
+                    <FileText className="w-4 h-4" />
+                    View uploaded document
+                  </a>
+                </div>
+              )}
               <div className="flex gap-2 justify-end pt-2">
                 <Button variant="outline" size="sm" onClick={() => setSelectedRecord(null)}>
                   Close
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleEditRecord(selectedRecord!.id)}>
-                  Edit
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  disabled={deletingRecordId === selectedRecord!.id}
-                  onClick={() => handleDeleteRecord(selectedRecord!.id)}
-                >
-                  Delete
-                </Button>
+                {canWrite && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => handleEditRecord(selectedRecord!.id)}>
+                      Edit
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={deletingRecordId === selectedRecord!.id}
+                      onClick={() => handleDeleteRecord(selectedRecord!.id)}
+                    >
+                      Delete
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -601,6 +630,59 @@ export function HealthRecords() {
                   onChange={(event) => updateForm("notes", event.target.value)}
                 />
               </div>
+
+              {/* Credential document upload — required for credibility verification */}
+              <div className="md:col-span-2">
+                <div className="text-sm font-medium mb-1.5">
+                  Credential Document
+                  {user?.role === "vet" && (
+                    <span className="ml-1 text-destructive">*</span>
+                  )}
+                </div>
+                <div
+                  className="flex items-center gap-3 p-3 border border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Upload className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {form.vetDocument ? (
+                      <span className="text-sm font-medium truncate block">{form.vetDocument.name}</span>
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium block">Upload veterinary licence / certificate</span>
+                        <span className="text-xs text-muted-foreground">PDF, JPG or PNG · max 5 MB</span>
+                      </>
+                    )}
+                  </div>
+                  {form.vetDocument && (
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-destructive text-xs shrink-0"
+                      onClick={(e) => { e.stopPropagation(); setForm((f) => ({ ...f, vetDocument: null })); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setForm((f) => ({ ...f, vetDocument: file }));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {user?.role === "vet"
+                    ? "Upload your DVS licence or practice certificate to achieve Vet Verified credibility."
+                    : "Upload your CAHW certificate to support CAHW Observation credibility."}
+                </p>
+              </div>
+
               <div className="md:col-span-2 flex gap-2 justify-end">
                 <Button
                   variant="outline"
@@ -674,33 +756,37 @@ export function HealthRecords() {
                             <Badge variant="warning">Escalated</Badge>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <Button variant="outline" size="sm" onClick={() => handleViewRecord(record.id)}>
                             View
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleEditRecord(record.id)}>
-                            Edit
-                          </Button>
-                          {!record.is_escalated && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={escalatingRecordId === record.id}
-                              onClick={() => handleEscalate(record.id)}
-                              title="Escalate to DVS Officer"
-                            >
-                              <ArrowUpCircle className="w-4 h-4" />
-                              Escalate
-                            </Button>
+                          {canWrite && (
+                            <>
+                              <Button variant="outline" size="sm" onClick={() => handleEditRecord(record.id)}>
+                                Edit
+                              </Button>
+                              {!record.is_escalated && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={escalatingRecordId === record.id}
+                                  onClick={() => handleEscalate(record.id)}
+                                  title="Escalate to DVS Officer"
+                                >
+                                  <ArrowUpCircle className="w-4 h-4" />
+                                  Escalate
+                                </Button>
+                              )}
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                disabled={deletingRecordId === record.id}
+                                onClick={() => handleDeleteRecord(record.id)}
+                              >
+                                Delete
+                              </Button>
+                            </>
                           )}
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            disabled={deletingRecordId === record.id}
-                            onClick={() => handleDeleteRecord(record.id)}
-                          >
-                            Delete
-                          </Button>
                         </div>
                       </div>
                     </div>

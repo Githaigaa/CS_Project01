@@ -37,6 +37,13 @@ class BreedSerializer(serializers.ModelSerializer):
 class AnimalSerializer(serializers.ModelSerializer):
     breed_detail = BreedSerializer(source='breed', read_only=True)
     photos = AnimalPhotoSerializer(many=True, read_only=True)
+    photo = serializers.SerializerMethodField()
+
+    def get_photo(self, obj):
+        if not obj.photo:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.photo.url) if request else obj.photo.url
     breed = serializers.PrimaryKeyRelatedField(
         queryset=Breed.objects.all(),
         allow_null=True,

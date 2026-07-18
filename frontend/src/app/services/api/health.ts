@@ -7,6 +7,16 @@ import type {
 import type { PaginatedResponse } from "../../lib/api/animals";
 import { apiClient } from "./client";
 
+function toFormDataOrJson(payload: Partial<HealthRecordPayload>): FormData | Partial<HealthRecordPayload> {
+  if (!payload.vet_document) return payload;
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === null || value === undefined) continue;
+    fd.append(key, value instanceof File ? value : String(value));
+  }
+  return fd;
+}
+
 function normalizeListResponse(data: HealthRecordListResponse): PaginatedResponse<ApiHealthRecord> {
   if (Array.isArray(data)) {
     return {
@@ -41,7 +51,9 @@ export const healthApi = {
   },
 
   async createHealthRecord(payload: HealthRecordPayload): Promise<ApiHealthRecord> {
-    const { data } = await apiClient.post<ApiHealthRecord>("/health-events/", payload);
+    const body = toFormDataOrJson(payload);
+    const headers = body instanceof FormData ? { "Content-Type": "multipart/form-data" } : {};
+    const { data } = await apiClient.post<ApiHealthRecord>("/health-events/", body, { headers });
     return data;
   },
 
@@ -49,7 +61,9 @@ export const healthApi = {
     id: number | string,
     payload: Partial<HealthRecordPayload>,
   ): Promise<ApiHealthRecord> {
-    const { data } = await apiClient.patch<ApiHealthRecord>(`/health-events/${id}/`, payload);
+    const body = toFormDataOrJson(payload);
+    const headers = body instanceof FormData ? { "Content-Type": "multipart/form-data" } : {};
+    const { data } = await apiClient.patch<ApiHealthRecord>(`/health-events/${id}/`, body, { headers });
     return data;
   },
 

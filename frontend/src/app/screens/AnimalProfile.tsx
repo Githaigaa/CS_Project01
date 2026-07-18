@@ -9,6 +9,8 @@ import {
   TrendingUp,
   Heart,
   Receipt,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
@@ -30,6 +32,73 @@ import { isAxiosError } from "axios";
 interface AnimalProfileProps {
   animalId: string;
   onBack: () => void;
+}
+
+function AnimalPhotoGallery({
+  photos,
+  fallback,
+  breed,
+}: {
+  photos?: string[];
+  fallback?: string;
+  breed: string;
+}) {
+  const [idx, setIdx] = useState(0);
+  const allPhotos = photos?.length ? photos : fallback ? [fallback] : [];
+
+  if (allPhotos.length === 0) {
+    return (
+      <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-4 flex items-center justify-center">
+        <div className="text-muted-foreground text-sm text-center p-4">No photo</div>
+      </div>
+    );
+  }
+
+  const prev = () => setIdx((i) => (i - 1 + allPhotos.length) % allPhotos.length);
+  const next = () => setIdx((i) => (i + 1) % allPhotos.length);
+
+  return (
+    <div className="mb-4">
+      <div className="aspect-square rounded-lg overflow-hidden bg-muted relative">
+        <img
+          src={allPhotos[idx]}
+          alt={`${breed} photo ${idx + 1}`}
+          className="w-full h-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+        />
+        {allPhotos.length > 1 && (
+          <>
+            <button
+              onClick={prev}
+              className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={next}
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+              {allPhotos.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${i === idx ? "bg-white" : "bg-white/50"}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      {allPhotos.length > 1 && (
+        <p className="text-xs text-muted-foreground text-center mt-1">
+          {idx + 1} / {allPhotos.length}
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -192,17 +261,8 @@ export function AnimalProfile({ animalId, onBack }: AnimalProfileProps) {
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-4 flex items-center justify-center">
-              {animal.photo ? (
-                <img
-                  src={animal.photo}
-                  alt={animal.breed}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="text-muted-foreground text-sm text-center p-4">No photo</div>
-              )}
-            </div>
+            <AnimalPhotoGallery photos={animal.photos} fallback={animal.photo} breed={animal.breed} />
+
             <div className="space-y-2">
               <div>
                 <div className="text-muted-foreground">Species</div>

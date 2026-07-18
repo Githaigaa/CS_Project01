@@ -1,25 +1,26 @@
 """Health record API viewset."""
 
 from django.db.models import Q
-from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from CattleTrace.api.permissions import IsHealthRecordAuthorized
-from CattleTrace.api.v1.mixins import AnimalRelatedQuerysetMixin
+from CattleTrace.api.v1.mixins import SignalValidationMixin
 from CattleTrace.api.v1.serializers import HealthRecordSerializer
 from CattleTrace.models import HealthRecord, Notification, User
 
 
-class HealthRecordViewSet(AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):
+class HealthRecordViewSet(SignalValidationMixin, viewsets.ModelViewSet):
     queryset = HealthRecord.objects.select_related(
         'animal', 'vet', 'diagnosis', 'vaccine_used',
     ).all()
     serializer_class = HealthRecordSerializer
     permission_classes = (IsAuthenticated, IsHealthRecordAuthorized)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     filter_backends = (SearchFilter, OrderingFilter)
     search_fields = (
         'animal__tag_number', 'animal__rfid_tag', 'diagnosis__name',
@@ -29,7 +30,15 @@ class HealthRecordViewSet(AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):
     ordering = ('-date',)
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        # All authenticated users may read; write is gated by IsHealthRecordAuthorized.
+        # Farmers see only their own animals' records; everyone else sees all.
+        queryset = HealthRecord.objects.select_related(
+            'animal', 'vet', 'diagnosis', 'vaccine_used',
+        ).all()
+        user = self.request.user
+        if user.role == User.Role.FARMER:
+            queryset = queryset.filter(animal__current_owner=user)
+
         animal_tag = self.request.query_params.get('animal')
         if animal_tag:
             queryset = queryset.filter(animal__tag_number=animal_tag)

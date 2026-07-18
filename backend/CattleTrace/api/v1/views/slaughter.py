@@ -8,7 +8,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
 from CattleTrace.api.permissions import IsSlaughterAuthorized
-from CattleTrace.api.v1.mixins import AnimalRelatedQuerysetMixin
+from CattleTrace.api.v1.mixins import AnimalRelatedQuerysetMixin, SignalValidationMixin
 from CattleTrace.api.v1.serializers import AbattoirSerializer, SlaughterRecordSerializer
 from CattleTrace.api.v1.serializers.animal import AnimalSerializer
 from CattleTrace.models import Abattoir, Animal, SlaughterRecord, User
@@ -38,7 +38,7 @@ class AbattoirViewSet(viewsets.ModelViewSet):
         return Abattoir.objects.filter(is_active=True)
 
 
-class SlaughterRecordViewSet(AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):
+class SlaughterRecordViewSet(SignalValidationMixin, AnimalRelatedQuerysetMixin, viewsets.ModelViewSet):
     queryset = SlaughterRecord.objects.select_related(
         'animal', 'abattoir', 'inspector',
     ).all()

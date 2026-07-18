@@ -125,17 +125,19 @@ class IsTransactionParticipant(BasePermission):
 
 
 class IsHealthRecordAuthorized(BasePermission):
-    """Health records: owner read; vet/staff write; vet/staff/admin read all."""
+    """Health records: VET/CAHW write; all authenticated users read."""
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user.role in (User.Role.VET, User.Role.CAHW)
 
     def has_object_permission(self, request, view, obj):
-        user = request.user
-        staff_roles = (User.Role.VET, User.Role.INSPECTOR, User.Role.ADMIN)
         if request.method in SAFE_METHODS:
-            return (
-                obj.animal.current_owner_id == user.id
-                or user.role in staff_roles
-            )
-        return user.role in staff_roles or obj.animal.current_owner_id == user.id
+            return True
+        return request.user.role in (User.Role.VET, User.Role.CAHW)
 
 
 class IsMovementAuthorized(BasePermission):

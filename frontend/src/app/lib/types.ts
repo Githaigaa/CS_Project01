@@ -14,6 +14,7 @@ export interface Animal {
   status: "Active" | "Sold" | "Stolen" | "Dead" | "Slaughtered" | "For Sale";
   registrationDate: string;
   photo?: string;
+  photos?: string[];
   traceabilityScore?: number;
 }
 

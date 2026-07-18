@@ -110,6 +110,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             'seller_name',
             'agreed_price',
             'payment_method',
+            'payment_status',
             'payment_ref',
             'transaction_date',
             'notes',

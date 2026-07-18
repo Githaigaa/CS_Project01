@@ -25,6 +25,14 @@ export const FARMER_STATUS_OPTIONS: { value: FarmerSettableStatus; label: string
   { value: "slaughtered", label: "Slaughtered" },
 ];
 
+export interface ApiAnimalPhoto {
+  id: number;
+  image: string | null;
+  image_url: string | null;
+  url: string;
+  order: number;
+}
+
 export interface ApiAnimal {
   id: number;
   tag_number: string;
@@ -49,6 +57,7 @@ export interface ApiAnimal {
   sire: number | null;
   status: ApiAnimalStatus;
   photo: string | null;
+  photos: ApiAnimalPhoto[];
   registered_by: number | null;
   registration_date: string;
   created_at: string;
@@ -124,7 +133,13 @@ export function mapApiAnimalToAnimal(apiAnimal: ApiAnimal): Animal {
     currentHolding: apiAnimal.current_farm_name || (apiAnimal.current_farm ? `Holding #${apiAnimal.current_farm}` : "Unassigned"),
     status: animalStatusLabels[apiAnimal.status],
     registrationDate: apiAnimal.registration_date,
-    photo: apiAnimal.photo || undefined,
+    photo: apiAnimal.photo
+      || apiAnimal.photos?.[0]?.image_url
+      || apiAnimal.photos?.[0]?.url
+      || undefined,
+    photos: apiAnimal.photos
+      ?.map((p) => p.image_url || p.url)
+      .filter((u): u is string => Boolean(u)),
     traceabilityScore: 100,
   };
 }
